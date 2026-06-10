@@ -1,6 +1,6 @@
 // Shared MeshCore types + display helpers for the live dashboard.
 
-import { analyzeRaw, PAYLOAD_TYPE_ADVERT } from "../../worker/lib/decode.js";
+import { analyzeRaw, bytesToHex, PAYLOAD_TYPE_ADVERT } from "../../worker/lib/decode.js";
 
 /** A logical packet (deduped by hash; heard by one or more observers). */
 export interface Packet {
@@ -122,12 +122,45 @@ export function advertPubkey(p: Packet): string | null {
   return null;
 }
 
+// Payload types whose payload starts dest_hash(1) + src_hash(1) — the src hash
+// is a 1-byte prefix of the sender's pubkey (see Mesh.cpp / Dispatcher logging).
+const SRC_HASH_TYPES = new Set([0, 1, 2, 8]); // REQ, RESPONSE, TXT_MSG, PATH
+const PAYLOAD_TYPE_ANON_REQ = 7; // dest_hash(1) + sender pubkey(32) + ...
+
+/**
+ * The sender's on-wire identity hash (hex pubkey prefix), where the protocol
+ * carries one. ADVERT → full pubkey; REQ/RESPONSE/TXT_MSG/PATH → 1-byte src
+ * hash; ANON_REQ → full pubkey. Returns null for types without a wire sender
+ * (ACK, GRP_TXT/GRP_DATA — the group sender hides inside the ciphertext).
+ *
+ * Note the path is NOT used: flood relays append their own hash when
+ * re-flooding (Mesh::routeRecvPacket), so path hops are relays, never the
+ * originator.
+ */
+export function senderHash(p: Packet): string | null {
+  if (!p.raw || p.payload_type == null) return null;
+  if (p.payload_type === PAYLOAD_TYPE_ADVERT) return advertPubkey(p);
+  if (SRC_HASH_TYPES.has(p.payload_type)) {
+    const { packet } = analyzeRaw(p.raw);
+    if (packet?.payload && packet.payload.length >= 2) {
+      return packet.payload[1].toString(16).padStart(2, "0");
+    }
+  }
+  if (p.payload_type === PAYLOAD_TYPE_ANON_REQ) {
+    const { packet } = analyzeRaw(p.raw);
+    if (packet?.payload && packet.payload.length >= 33) {
+      return bytesToHex(packet.payload, 1, 33);
+    }
+  }
+  return null;
+}
+
 /**
  * Match a packet against a sender filter query. Hex token(s) (space-separated,
- * 1–4 bytes each, e.g. "a3 7f", "baba cfcf", "a1b2c3") match the packet's path
- * hops (prefix either way, so any network hash size works) or — for path-less
- * adverts — the advertised pubkey prefix. A non-hex query matches the resolved
- * sender name (substring).
+ * 1–4 bytes each, e.g. "a3 7f", "baba cfcf", "a1b2c3") match the packet's
+ * on-wire sender hash (advert/anon-req pubkey or src hash) or its path hops
+ * (prefix either way, so any network hash size works). A non-hex query matches
+ * the resolved sender name (substring).
  */
 export function matchesSenderQuery(p: Packet, query: string, nodes: MeshNode[]): boolean {
   const q = query.trim().toLowerCase();
@@ -136,11 +169,11 @@ export function matchesSenderQuery(p: Packet, query: string, nodes: MeshNode[]):
   const allHex = tokens.every((t) => t.length >= 2 && t.length <= 8 && t.length % 2 === 0 && /^[0-9a-f]+$/.test(t));
   if (allHex) {
     const path = p.path.map((h) => h.toLowerCase());
-    const advPk = advertPubkey(p)?.toLowerCase() ?? null;
+    const sh = senderHash(p)?.toLowerCase() ?? null;
     return tokens.some(
       (h) =>
         path.some((t) => t.startsWith(h) || h.startsWith(t)) ||
-        (advPk != null && advPk.startsWith(h))
+        (sh != null && (sh.startsWith(h) || h.startsWith(sh)))
     );
   }
   return (senderName(p, nodes) ?? "").toLowerCase().includes(q);
@@ -307,17 +340,21 @@ export function nodeForHash(hash: string, nodes: MeshNode[]): MeshNode | null {
  * Returns null when the sender can't be determined (unknown relay, no raw).
  */
 export function senderName(p: Packet, nodes: MeshNode[]): string | null {
+  // Adverts carry the most context: directory name, then the advert's own
+  // embedded name, then a short pubkey.
   if (p.payload_type === PAYLOAD_TYPE_ADVERT && p.raw) {
     const { advert } = analyzeRaw(p.raw);
     if (advert) {
-      // Prefer the node directory's name, then the advert's own name, then a
-      // short pubkey so an unnamed/location-less advert still attributes.
       const known = nodes.find((n) => n.pubkey.toLowerCase() === advert.pubkey.toLowerCase());
       return known?.name || advert.name || advert.pubkey.slice(0, 12);
     }
   }
-  if (!nodes.length || p.path.length === 0) return null;
-  return nodeForHash(p.path[0], nodes)?.name ?? null;
+  // Other types: resolve the on-wire sender hash against the node directory;
+  // fall back to showing the raw hash so an unknown sender still attributes.
+  const h = senderHash(p);
+  if (!h) return null;
+  const node = nodeForHash(h, nodes);
+  return node?.name || (h.length > 8 ? h.slice(0, 12) : h);
 }
 
 export function formatTime(epochMs: number): string {

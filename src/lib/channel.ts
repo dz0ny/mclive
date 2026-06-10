@@ -100,6 +100,26 @@ export async function deriveChannel(
   }
 }
 
+/**
+ * Derive every channel this browser knows: the well-known public channel plus
+ * any channels the user added on the Channels page (persisted in localStorage
+ * under "mclive.channels"). Used wherever GRP_TXT senders need decoding.
+ */
+export async function loadAllChannels(): Promise<Channel[]> {
+  const out: Channel[] = [];
+  const pub = await deriveChannel("Public", PUBLIC_PSK_B64, true);
+  if (pub) out.push(pub);
+  try {
+    const raw = localStorage.getItem("mclive.channels");
+    const stored: { name: string; psk?: string }[] = raw ? JSON.parse(raw) : [];
+    for (const c of stored) {
+      const ch = await deriveChannel(c.name, c.psk);
+      if (ch) out.push(ch);
+    }
+  } catch {}
+  return out;
+}
+
 /** Extract the payload (after wire header + path) from a raw wire packet hex. */
 function wirePayload(rawHex: string): Uint8Array | null {
   const b = hexToBytes(rawHex);

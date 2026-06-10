@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { decodeGroupText, loadAllChannels, type Channel } from "@/lib/channel";
 import type { MeshNode, Packet } from "@/lib/meshcore";
 import {
   formatTime,
@@ -29,9 +30,17 @@ interface Props {
   onSelect: (p: Packet) => void;
 }
 
-function packetNode(p: Packet, nodes?: MeshNode[]): string | null {
-  // Adverts carry their own sender identity; other types resolve via the path.
-  return senderName(p, nodes ?? []);
+function packetNode(p: Packet, nodes: MeshNode[], channels: Channel[]): string | null {
+  // Adverts carry their pubkey; REQ/RESPONSE/TXT/PATH carry a 1-byte src hash;
+  // ANON_REQ a full pubkey — all resolved from the payload, never the path
+  // (path hops are relays, not the originator).
+  const name = senderName(p, nodes);
+  if (name) return name;
+  // GRP_TXT hides the sender inside the ciphertext — decryptable on known channels.
+  if (p.payload_type === 5 && p.raw && channels.length) {
+    return decodeGroupText(p.raw, channels)?.sender ?? null;
+  }
+  return null;
 }
 
 // Path hash width in bytes (a hop token is hex, so 2 chars = 1 byte). Identifies
@@ -46,6 +55,19 @@ export default function PacketTable({ packets, selectedId, nodes, onSelect }: Pr
   const [types, setTypes] = useState<Set<number>>(new Set());
   const [routes, setRoutes] = useState<Set<string>>(new Set());
   const [hashSizes, setHashSizes] = useState<Set<number>>(new Set());
+  const [channels, setChannels] = useState<Channel[]>([]);
+
+  // known channels (public + user-added), for decoding GRP_TXT senders
+  useEffect(() => {
+    loadAllChannels().then(setChannels).catch(() => {});
+  }, []);
+
+  // sender label per packet, memoized — decryption/decoding is per-row work
+  const senderLabels = useMemo(() => {
+    const m = new Map<Packet, string | null>();
+    for (const p of packets) m.set(p, packetNode(p, nodes ?? [], channels));
+    return m;
+  }, [packets, nodes, channels]);
 
   // options present in the current data
   const typeOptions = useMemo(() => {
@@ -69,15 +91,26 @@ export default function PacketTable({ packets, selectedId, nodes, onSelect }: Pr
 
   const rows = useMemo(() => {
     const pq = pathQ.trim().toLowerCase();
+    const sq = sender.trim().toLowerCase();
+    const sqIsHex =
+      sq.length > 0 &&
+      sq.split(/\s+/).every((t) => t.length >= 2 && t.length <= 8 && t.length % 2 === 0 && /^[0-9a-f]+$/.test(t));
     return packets.filter((p) => {
-      if (sender.trim() && !matchesSenderQuery(p, sender, nodes ?? [])) return false;
+      if (sq) {
+        // hex → match on-wire sender hash / path hops; text → match resolved label
+        if (sqIsHex) {
+          if (!matchesSenderQuery(p, sender, nodes ?? [])) return false;
+        } else if (!(senderLabels.get(p) ?? "").toLowerCase().includes(sq)) {
+          return false;
+        }
+      }
       if (pq && !p.path.some((h) => h.toLowerCase().includes(pq))) return false;
       if (hashSizes.size && !hashSizes.has(pathBytes(p))) return false;
       if (types.size && (p.payload_type == null || !types.has(p.payload_type))) return false;
       if (routes.size && (!p.route || !routes.has(p.route))) return false;
       return true;
     });
-  }, [packets, nodes, sender, pathQ, hashSizes, types, routes]);
+  }, [packets, nodes, sender, senderLabels, pathQ, hashSizes, types, routes]);
 
   return (
     <div className="rounded-lg border">
@@ -156,7 +189,7 @@ export default function PacketTable({ packets, selectedId, nodes, onSelect }: Pr
             >
               <TableCell className="font-mono text-xs tabular-nums">{formatTime(p.last_seen)}</TableCell>
               <TableCell className="text-xs">
-                {packetNode(p, nodes) ?? <span className="text-muted-foreground">—</span>}
+                {senderLabels.get(p) ?? <span className="text-muted-foreground">—</span>}
               </TableCell>
               <TableCell>
                 <Badge variant="outline" className={cn("font-mono", typeBadgeClass(p.payload_type))}>
