@@ -50,6 +50,25 @@ pattern = "example.com"
 custom_domain = true
 ```
 
+## Add an observer
+
+The map and packet feed are populated by **observer nodes** — MeshCore devices
+running the MQTT observer firmware ([`mc-mq`](https://github.com/dz0ny/mc-mq),
+e.g. `pio run -e Heltec_Wireless_Paper_repeater_observer_mqtt -t upload`). An
+observer hears LoRa traffic and uplinks each packet to this Worker over
+MQTT-over-WebSocket. Point one at your deployment with a single DSN:
+
+```
+set mqtt.url0 wss://observer:<INGEST_TOKEN>@<your-worker-host>/mqtt
+set mqtt.iata SEA          # region code, places the observer on the map
+set bridge.source rx
+```
+
+`<INGEST_TOKEN>` must match the Worker's `INGEST_TOKEN` secret. You can fan out
+to up to three sinks (`mqtt.url0`/`1`/`2`). New observers show up automatically
+on the **Observers** page. Full setup (TLS, replay without hardware, topic
+format) is in [`bridge/README.md`](./bridge/README.md).
+
 ## Stack
 
 Astro 6 · Tailwind CSS v4 · shadcn/ui · TypeScript · Biome · Bun · Cloudflare Workers
