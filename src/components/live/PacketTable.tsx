@@ -34,11 +34,18 @@ function packetNode(p: Packet, nodes?: MeshNode[]): string | null {
   return senderName(p, nodes ?? []);
 }
 
+// Path hash width in bytes (a hop token is hex, so 2 chars = 1 byte). Identifies
+// the network generation: 1-byte = old networks, 2/3-byte = newer. 0 = no path.
+function pathBytes(p: Packet): number {
+  return p.path.length ? p.path[0].length >> 1 : 0;
+}
+
 export default function PacketTable({ packets, selectedId, nodes, onSelect }: Props) {
   const [sender, setSender] = useState("");
   const [pathQ, setPathQ] = useState("");
   const [types, setTypes] = useState<Set<number>>(new Set());
   const [routes, setRoutes] = useState<Set<string>>(new Set());
+  const [hashSizes, setHashSizes] = useState<Set<number>>(new Set());
 
   // options present in the current data
   const typeOptions = useMemo(() => {
@@ -51,17 +58,26 @@ export default function PacketTable({ packets, selectedId, nodes, onSelect }: Pr
     for (const p of packets) if (p.route) s.add(p.route);
     return [...s];
   }, [packets]);
+  const hashSizeOptions = useMemo(() => {
+    const s = new Set<number>();
+    for (const p of packets) {
+      const b = pathBytes(p);
+      if (b > 0) s.add(b);
+    }
+    return [...s].sort((a, b) => a - b);
+  }, [packets]);
 
   const rows = useMemo(() => {
     const pq = pathQ.trim().toLowerCase();
     return packets.filter((p) => {
       if (sender.trim() && !matchesSenderQuery(p, sender, nodes ?? [])) return false;
       if (pq && !p.path.some((h) => h.toLowerCase().includes(pq))) return false;
+      if (hashSizes.size && !hashSizes.has(pathBytes(p))) return false;
       if (types.size && (p.payload_type == null || !types.has(p.payload_type))) return false;
       if (routes.size && (!p.route || !routes.has(p.route))) return false;
       return true;
     });
-  }, [packets, nodes, sender, pathQ, types, routes]);
+  }, [packets, nodes, sender, pathQ, hashSizes, types, routes]);
 
   return (
     <div className="rounded-lg border">
@@ -101,7 +117,26 @@ export default function PacketTable({ packets, selectedId, nodes, onSelect }: Pr
             </TableHead>
             <TableHead className="text-right">Len</TableHead>
             <TableHead>
-              <TextFilterHead label="Path" value={pathQ} onChange={setPathQ} placeholder="Filter by hop hash…" />
+              <span className="flex items-center gap-2">
+                <TextFilterHead label="Path" value={pathQ} onChange={setPathQ} placeholder="Filter by hop hash…" />
+                <OptionFilterHead
+                  label="bytes"
+                  active={hashSizes.size > 0}
+                  onClear={() => setHashSizes(new Set())}
+                  align="end"
+                >
+                  {hashSizeOptions.length === 0 && (
+                    <span className="text-muted-foreground block px-2 py-1.5 text-xs">no paths yet</span>
+                  )}
+                  {hashSizeOptions.map((b) => (
+                    <OptionRow key={b} selected={hashSizes.has(b)} onClick={() => setHashSizes(toggleInSet(hashSizes, b))}>
+                      <span className="font-mono text-xs">
+                        {b}-byte <span className="text-muted-foreground">{b === 1 ? "(old)" : "(new)"}</span>
+                      </span>
+                    </OptionRow>
+                  ))}
+                </OptionFilterHead>
+              </span>
             </TableHead>
           </TableRow>
         </TableHeader>
