@@ -67,7 +67,10 @@ export default function DetailMap({ advert, hops }: Props) {
 
     const pts: number[][] = [];
     const source =
-      advert?.hasLatLon && advert.lat != null && advert.lon != null
+      advert?.hasLatLon &&
+      advert.lat != null &&
+      advert.lon != null &&
+      !(advert.lat === 0 && advert.lon === 0) // no GPS fix → 0,0, don't draw
         ? fromLonLat([advert.lon, advert.lat])
         : null;
 

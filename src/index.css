@@ -374,6 +374,182 @@ All colors MUST be HSL.
     --input: 249 15% 28%;
     --ring: 2 55% 83%;
   }
+
+  /* Gruvbox (Light / Dark) — warm retro, orange accent */
+  html[data-theme="gruvbox"] {
+    --background: 48 87% 88%;
+    --foreground: 20 5% 22%;
+    --card: 48 87% 94%;
+    --card-foreground: 20 5% 22%;
+    --popover: 48 87% 94%;
+    --popover-foreground: 20 5% 22%;
+    --primary: 27 88% 41%;
+    --primary-foreground: 48 87% 94%;
+    --secondary: 40 60% 81%;
+    --secondary-foreground: 20 5% 22%;
+    --muted: 43 60% 84%;
+    --muted-foreground: 28 11% 36%;
+    --accent: 40 60% 81%;
+    --accent-foreground: 20 5% 22%;
+    --destructive: 2 75% 46%;
+    --destructive-foreground: 48 87% 94%;
+    --border: 40 38% 73%;
+    --input: 40 38% 73%;
+    --ring: 27 88% 41%;
+  }
+  html[data-theme="gruvbox"].dark {
+    --background: 0 0% 16%;
+    --foreground: 40 60% 81%;
+    --card: 20 5% 22%;
+    --card-foreground: 40 60% 81%;
+    --popover: 20 5% 22%;
+    --popover-foreground: 40 60% 81%;
+    --primary: 27 99% 55%;
+    --primary-foreground: 0 0% 16%;
+    --secondary: 20 5% 22%;
+    --secondary-foreground: 40 60% 81%;
+    --muted: 22 7% 26%;
+    --muted-foreground: 39 22% 64%;
+    --accent: 24 7% 30%;
+    --accent-foreground: 40 60% 81%;
+    --destructive: 6 96% 59%;
+    --destructive-foreground: 0 0% 16%;
+    --border: 22 7% 26%;
+    --input: 24 7% 30%;
+    --ring: 27 99% 55%;
+  }
+
+  /* Dracula (Alucard / Dracula) — purple accent */
+  html[data-theme="dracula"] {
+    --background: 60 30% 96%;
+    --foreground: 231 15% 18%;
+    --card: 0 0% 100%;
+    --card-foreground: 231 15% 18%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 231 15% 18%;
+    --primary: 265 60% 50%;
+    --primary-foreground: 60 30% 96%;
+    --secondary: 60 14% 89%;
+    --secondary-foreground: 231 15% 18%;
+    --muted: 60 14% 91%;
+    --muted-foreground: 225 14% 41%;
+    --accent: 60 14% 89%;
+    --accent-foreground: 231 15% 18%;
+    --destructive: 0 75% 50%;
+    --destructive-foreground: 60 30% 96%;
+    --border: 60 10% 84%;
+    --input: 60 10% 84%;
+    --ring: 265 60% 50%;
+  }
+  html[data-theme="dracula"].dark {
+    --background: 231 15% 18%;
+    --foreground: 60 30% 96%;
+    --card: 232 14% 23%;
+    --card-foreground: 60 30% 96%;
+    --popover: 232 14% 23%;
+    --popover-foreground: 60 30% 96%;
+    --primary: 265 89% 78%;
+    --primary-foreground: 231 15% 18%;
+    --secondary: 232 14% 26%;
+    --secondary-foreground: 60 30% 96%;
+    --muted: 232 14% 26%;
+    --muted-foreground: 225 27% 61%;
+    --accent: 232 14% 31%;
+    --accent-foreground: 60 30% 96%;
+    --destructive: 0 100% 67%;
+    --destructive-foreground: 231 15% 18%;
+    --border: 232 14% 26%;
+    --input: 232 14% 31%;
+    --ring: 265 89% 78%;
+  }
+
+  /* Solarized (Light / Dark) — classic blue accent */
+  html[data-theme="solarized"] {
+    --background: 44 87% 94%;
+    --foreground: 192 15% 35%;
+    --card: 44 87% 97%;
+    --card-foreground: 192 15% 35%;
+    --popover: 44 87% 97%;
+    --popover-foreground: 192 15% 35%;
+    --primary: 205 69% 43%;
+    --primary-foreground: 44 87% 97%;
+    --secondary: 44 38% 88%;
+    --secondary-foreground: 192 15% 35%;
+    --muted: 44 38% 90%;
+    --muted-foreground: 194 14% 45%;
+    --accent: 44 38% 88%;
+    --accent-foreground: 192 15% 35%;
+    --destructive: 1 71% 52%;
+    --destructive-foreground: 44 87% 97%;
+    --border: 44 30% 80%;
+    --input: 44 30% 80%;
+    --ring: 205 69% 43%;
+  }
+  html[data-theme="solarized"].dark {
+    --background: 192 100% 11%;
+    --foreground: 186 8% 65%;
+    --card: 192 81% 14%;
+    --card-foreground: 186 8% 65%;
+    --popover: 192 81% 14%;
+    --popover-foreground: 186 8% 65%;
+    --primary: 205 69% 55%;
+    --primary-foreground: 192 100% 11%;
+    --secondary: 192 81% 16%;
+    --secondary-foreground: 186 8% 65%;
+    --muted: 192 81% 16%;
+    --muted-foreground: 194 14% 50%;
+    --accent: 192 50% 21%;
+    --accent-foreground: 186 8% 70%;
+    --destructive: 1 71% 52%;
+    --destructive-foreground: 44 87% 94%;
+    --border: 192 81% 16%;
+    --input: 192 50% 21%;
+    --ring: 205 69% 55%;
+  }
+
+  /* Everforest (Light / Dark) — soft green accent */
+  html[data-theme="everforest"] {
+    --background: 43 57% 89%;
+    --foreground: 202 11% 40%;
+    --card: 44 64% 93%;
+    --card-foreground: 202 11% 40%;
+    --popover: 44 64% 93%;
+    --popover-foreground: 202 11% 40%;
+    --primary: 88 96% 28%;
+    --primary-foreground: 44 64% 93%;
+    --secondary: 47 44% 84%;
+    --secondary-foreground: 202 11% 40%;
+    --muted: 47 44% 86%;
+    --muted-foreground: 200 8% 47%;
+    --accent: 47 44% 84%;
+    --accent-foreground: 202 11% 40%;
+    --destructive: 1 67% 53%;
+    --destructive-foreground: 44 64% 93%;
+    --border: 50 31% 79%;
+    --input: 50 31% 79%;
+    --ring: 88 96% 28%;
+  }
+  html[data-theme="everforest"].dark {
+    --background: 206 14% 20%;
+    --foreground: 41 32% 75%;
+    --card: 199 13% 24%;
+    --card-foreground: 41 32% 75%;
+    --popover: 199 13% 24%;
+    --popover-foreground: 41 32% 75%;
+    --primary: 83 35% 63%;
+    --primary-foreground: 206 14% 20%;
+    --secondary: 200 12% 27%;
+    --secondary-foreground: 41 32% 75%;
+    --muted: 200 12% 27%;
+    --muted-foreground: 203 5% 55%;
+    --accent: 202 11% 31%;
+    --accent-foreground: 41 32% 75%;
+    --destructive: 359 68% 70%;
+    --destructive-foreground: 206 14% 20%;
+    --border: 200 12% 27%;
+    --input: 202 11% 31%;
+    --ring: 83 35% 63%;
+  }
 }
 
 @layer base {
