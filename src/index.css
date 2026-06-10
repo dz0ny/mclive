@@ -550,6 +550,94 @@ All colors MUST be HSL.
     --input: 202 11% 31%;
     --ring: 83 35% 63%;
   }
+
+  /* Osaka Jade (Light / Dark) — deep sea-green base, jade accent */
+  html[data-theme="osaka"] {
+    --background: 150 25% 94%;
+    --foreground: 168 25% 18%;
+    --card: 150 30% 97%;
+    --card-foreground: 168 25% 18%;
+    --popover: 150 30% 97%;
+    --popover-foreground: 168 25% 18%;
+    --primary: 163 45% 32%;
+    --primary-foreground: 150 30% 97%;
+    --secondary: 153 20% 87%;
+    --secondary-foreground: 168 25% 18%;
+    --muted: 153 20% 89%;
+    --muted-foreground: 167 12% 38%;
+    --accent: 153 20% 85%;
+    --accent-foreground: 168 25% 18%;
+    --destructive: 5 65% 50%;
+    --destructive-foreground: 150 30% 97%;
+    --border: 153 17% 79%;
+    --input: 153 17% 79%;
+    --ring: 163 45% 32%;
+  }
+  html[data-theme="osaka"].dark {
+    --background: 170 32% 8%;
+    --foreground: 150 26% 82%;
+    --card: 169 28% 11%;
+    --card-foreground: 150 26% 82%;
+    --popover: 169 28% 11%;
+    --popover-foreground: 150 26% 82%;
+    --primary: 160 42% 55%;
+    --primary-foreground: 170 32% 8%;
+    --secondary: 168 24% 14%;
+    --secondary-foreground: 150 26% 82%;
+    --muted: 168 24% 14%;
+    --muted-foreground: 158 12% 56%;
+    --accent: 166 22% 19%;
+    --accent-foreground: 150 26% 82%;
+    --destructive: 5 70% 62%;
+    --destructive-foreground: 170 32% 8%;
+    --border: 168 24% 15%;
+    --input: 166 22% 19%;
+    --ring: 160 42% 55%;
+  }
+
+  /* Hackerman (Light / Dark) — phosphor-green terminal */
+  html[data-theme="hackerman"] {
+    --background: 100 12% 95%;
+    --foreground: 120 60% 12%;
+    --card: 90 20% 98%;
+    --card-foreground: 120 60% 12%;
+    --popover: 90 20% 98%;
+    --popover-foreground: 120 60% 12%;
+    --primary: 130 85% 26%;
+    --primary-foreground: 90 20% 98%;
+    --secondary: 110 14% 88%;
+    --secondary-foreground: 120 60% 12%;
+    --muted: 110 14% 90%;
+    --muted-foreground: 125 18% 34%;
+    --accent: 110 14% 86%;
+    --accent-foreground: 120 60% 12%;
+    --destructive: 0 80% 42%;
+    --destructive-foreground: 90 20% 98%;
+    --border: 110 12% 80%;
+    --input: 110 12% 80%;
+    --ring: 130 85% 26%;
+  }
+  html[data-theme="hackerman"].dark {
+    --background: 120 15% 4%;
+    --foreground: 130 90% 70%;
+    --card: 120 14% 7%;
+    --card-foreground: 130 90% 70%;
+    --popover: 120 14% 7%;
+    --popover-foreground: 130 90% 70%;
+    --primary: 135 100% 54%;
+    --primary-foreground: 120 15% 4%;
+    --secondary: 120 13% 10%;
+    --secondary-foreground: 130 90% 70%;
+    --muted: 120 13% 10%;
+    --muted-foreground: 130 35% 48%;
+    --accent: 125 18% 14%;
+    --accent-foreground: 130 90% 70%;
+    --destructive: 0 100% 60%;
+    --destructive-foreground: 120 15% 4%;
+    --border: 125 20% 12%;
+    --input: 125 18% 14%;
+    --ring: 135 100% 54%;
+  }
 }
 
 @layer base {
