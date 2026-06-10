@@ -1,0 +1,10 @@
+---
+import AppLayout from "@/layouts/AppLayout.astro";
+import Channels from "@/components/live/Channels";
+---
+
+<AppLayout title="Channels" bleed={true}>
+  <div class="absolute inset-0">
+    <Channels client:only="react" />
+  </div>
+</AppLayout>

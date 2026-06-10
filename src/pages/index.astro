@@ -1,0 +1,8 @@
+---
+import AppLayout from "@/layouts/AppLayout.astro";
+import LivePackets from "@/components/live/LivePackets";
+---
+
+<AppLayout title="Packets">
+  <LivePackets client:only="react" />
+</AppLayout>

@@ -1,0 +1,45 @@
+name = 'mclive'
+main="worker/index.js"
+compatibility_date = "2026-05-05"
+compatibility_flags = [ "nodejs_compat" ]
+preview_urls = true
+# Keep the workers.dev URL alive alongside the custom domain — the observer
+# firmware is configured with wss://mclive.dz0ny.workers.dev/mqtt.
+workers_dev = true
+
+# Data retention: wipe rows older than a week, daily at 03:17 UTC.
+[triggers]
+crons = ["17 3 * * *"]
+
+[observability.logs]
+enabled = false
+
+[placement]
+mode = "smart"
+
+[assets]
+directory = "./dist"
+not_found_handling = "404-page"
+html_handling = "force-trailing-slash"
+run_worker_first = ["/~*", "/mqtt"]
+
+# D1 database for live MeshCore packets.
+[[d1_databases]]
+binding = "DB"
+database_name = "mclive"
+database_id = "e653a251-ba80-44c8-814e-152f544107d3"
+migrations_dir = "migrations"
+
+# Durable Object hub: holds the ingest WebSocket, fans out to SSE clients,
+# and persists packets to D1.
+[[durable_objects.bindings]]
+name = "PACKET_HUB"
+class_name = "PacketHub"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["PacketHub"]
+
+[[routes]]
+pattern = "mclive.dz0ny.dev"
+custom_domain = true

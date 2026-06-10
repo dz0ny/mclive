@@ -1,0 +1,181 @@
+---
+import "../index.css";
+import MobileToolbar from "@/components/MobileToolbar";
+
+interface Props {
+  title?: string;
+  bleed?: boolean; // full-bleed main (no padding) — used by the map page
+}
+
+const { title, bleed = false } = Astro.props;
+const SITE_NAME = "MeshCore Live";
+const pageTitle = title ? `${title} · ${SITE_NAME}` : SITE_NAME;
+
+const path = Astro.url.pathname.replace(/\/$/, "") || "/";
+// inline lucide-style icon paths (stroke)
+const ICONS = {
+  radio: ['<path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/>', '<path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/>', '<circle cx="12" cy="12" r="2"/>', '<path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/>', '<path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/>'].join(""),
+  map: ['<path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/>', '<path d="M15 5.764v15"/>', '<path d="M9 3.236v15"/>'].join(""),
+  hash: ['<line x1="4" x2="20" y1="9" y2="9"/>', '<line x1="4" x2="20" y1="15" y2="15"/>', '<line x1="10" x2="8" y1="3" y2="21"/>', '<line x1="16" x2="14" y1="3" y2="21"/>'].join(""),
+  megaphone: ['<path d="m3 11 18-5v12L3 14v-3z"/>', '<path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>'].join(""),
+};
+const nav = [
+  { href: "/", label: "Packets", icon: ICONS.radio },
+  { href: "/map", label: "Map", icon: ICONS.map },
+  { href: "/adverts", label: "Adverts", icon: ICONS.megaphone },
+  { href: "/channels", label: "Channels", icon: ICONS.hash },
+];
+function isActive(href: string) {
+  return href === "/" ? path === "/" : path.startsWith(href);
+}
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>{pageTitle}</title>
+    <script is:inline>
+      // apply saved theme + palette before first paint (default: system preference, Nord)
+      (() => {
+        try {
+          const t = localStorage.getItem("mclive.theme");
+          if (t === "dark" || (!t && matchMedia("(prefers-color-scheme: dark)").matches)) {
+            document.documentElement.classList.add("dark");
+          }
+          const p = localStorage.getItem("mclive.palette");
+          if (p && p !== "nord") document.documentElement.dataset.theme = p;
+        } catch {}
+      })();
+    </script>
+  </head>
+  <body class="bg-background text-foreground flex h-screen overflow-hidden">
+    {/* desktop sidebar */}
+    <aside class="bg-card hidden w-52 shrink-0 flex-col border-r md:flex">
+      <div class="flex items-center gap-2 px-4 py-4">
+        <span class="bg-primary size-2.5 animate-pulse rounded-full"></span>
+        <span class="font-semibold tracking-tight">MeshCore Live</span>
+      </div>
+      <nav class="flex flex-col gap-1 px-2">
+        {
+          nav.map(({ href, label, icon }) => (
+            <a
+              href={href}
+              class:list={[
+                "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors",
+                isActive(href)
+                  ? "bg-primary/10 text-primary font-medium"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              ]}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round" class="size-4 shrink-0" set:html={icon}
+              />
+              {label}
+            </a>
+          ))
+        }
+      </nav>
+      <div class="mt-auto space-y-1 px-2 pb-2">
+        <div class="text-muted-foreground px-3 pt-2 text-[11px] font-semibold uppercase tracking-wide">
+          Theme
+        </div>
+        <select
+          data-palette
+          class="bg-card text-foreground border-input w-full rounded-md border px-2.5 py-1.5 text-sm"
+        >
+          <option value="nord">Nord</option>
+          <option value="tokyo">Tokyo Night</option>
+          <option value="catppuccin">Catppuccin</option>
+          <option value="rosepine">Rosé Pine</option>
+        </select>
+        <button
+          type="button"
+          data-theme-toggle
+          class="text-muted-foreground hover:bg-muted hover:text-foreground flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round" class="size-4 shrink-0">
+            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+          </svg>
+          <span class="dark:hidden">Dark variant</span>
+          <span class="hidden dark:inline">Light variant</span>
+        </button>
+        <div class="text-muted-foreground px-3 py-2 text-xs">Live LoRa mesh observatory</div>
+      </div>
+    </aside>
+
+    {/* content + mobile bottom nav */}
+    <div class="flex min-w-0 flex-1 flex-col">
+      <main class:list={["min-h-0 flex-1", bleed ? "relative" : "overflow-y-auto"]}>
+        {
+          bleed ? (
+            <slot />
+          ) : (
+            <div class="mx-auto w-full max-w-7xl px-4 py-6 md:px-6 md:py-8">
+              <slot />
+            </div>
+          )
+        }
+      </main>
+
+      <MobileToolbar client:load path={path} />
+    </div>
+
+    <script is:inline>
+      // dark/light variant toggle
+      document.querySelectorAll("[data-theme-toggle]").forEach((btn) =>
+        btn.addEventListener("click", () => {
+          const dark = document.documentElement.classList.toggle("dark");
+          try {
+            localStorage.setItem("mclive.theme", dark ? "dark" : "light");
+          } catch {}
+        })
+      );
+      // palette picker (sidebar select + mobile cycle button)
+      (() => {
+        const palettes = [
+          ["nord", "Nord"],
+          ["tokyo", "Tokyo Night"],
+          ["catppuccin", "Catppuccin"],
+          ["rosepine", "Rosé Pine"],
+        ];
+        let pal = "nord";
+        try {
+          pal = localStorage.getItem("mclive.palette") || "nord";
+        } catch {}
+        const apply = (v) => {
+          pal = v;
+          if (v === "nord") delete document.documentElement.dataset.theme;
+          else document.documentElement.dataset.theme = v;
+          try {
+            localStorage.setItem("mclive.palette", v);
+          } catch {}
+          document.querySelectorAll("[data-palette]").forEach((s) => {
+            s.value = v;
+          });
+          const name = (palettes.find((p) => p[0] === v) || palettes[0])[1];
+          document.querySelectorAll("[data-palette-label]").forEach((el) => {
+            el.textContent = name;
+          });
+        };
+        document.querySelectorAll("[data-palette]").forEach((sel) => {
+          sel.value = pal;
+          sel.addEventListener("change", () => apply(sel.value));
+        });
+        document.querySelectorAll("[data-palette-cycle]").forEach((btn) =>
+          btn.addEventListener("click", () => {
+            const i = palettes.findIndex((p) => p[0] === pal);
+            apply(palettes[(i + 1) % palettes.length][0]);
+          })
+        );
+        apply(pal);
+      })();
+    </script>
+  </body>
+</html>

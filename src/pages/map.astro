@@ -1,0 +1,10 @@
+---
+import AppLayout from "@/layouts/AppLayout.astro";
+import LiveMap from "@/components/live/LiveMap";
+---
+
+<AppLayout title="Map" bleed={true}>
+  <div class="absolute inset-0">
+    <LiveMap client:only="react" />
+  </div>
+</AppLayout>

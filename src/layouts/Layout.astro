@@ -1,0 +1,392 @@
+---
+import "../index.css";
+import { Button } from "@/components/ui/button";
+import { Schema } from "astro-seo-schema";
+import type { Thing, WithContext } from "schema-dts";
+
+interface Props {
+	title?: string;
+	description?: string;
+	noindex?: boolean;
+	socialImageUrl?: string;
+	schema?: WithContext<Thing> | WithContext<Thing>[];
+}
+
+// Site-wide defaults — update these for each new site
+const SITE_NAME = "Hakuto";
+const SITE_DESCRIPTION = "Astro + shadcn/ui website template for Hakuto.";
+
+// Agent readiness — set to true to expose site tools to AI agents via WebMCP
+const ENABLE_WEBMCP = false;
+
+const { url } = Astro;
+const {
+	title: pageTitle,
+	description = SITE_DESCRIPTION,
+	noindex = false,
+	socialImageUrl,
+	schema,
+} = Astro.props;
+
+// Construct uniform title: "Page Title | Site Name" or just "Site Name"
+const title = pageTitle ? `${pageTitle} | ${SITE_NAME}` : SITE_NAME;
+
+// Only include postMessage bridge in dev mode
+const isDev = import.meta.env.DEV;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="canonical" href={url.href} />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={url.href} />
+    <meta property="og:type" content="website" />
+    {socialImageUrl && (
+      <meta property="og:image" content={socialImageUrl} />
+      <meta property="og:image:alt" content={title} />
+    )}
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    {socialImageUrl && <meta name="twitter:image" content={socialImageUrl} />}
+    {schema && (Array.isArray(schema)
+      ? schema.map((s) => <Schema item={s} />)
+      : <Schema item={schema} />
+    )}
+  </head>
+
+  <body class="min-h-screen bg-background text-foreground flex flex-col">
+    {/* Template header with Hakuto branding */}
+    <header class="border-b">
+      <div class="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
+        <a href="/" class="text-lg font-semibold tracking-tight">Hakuto Template</a>
+        {/* Example React island (shadcn/ui). Remove if not needed. */}
+        <Button variant="secondary" size="sm">Example Button</Button>
+      </div>
+    </header>
+
+    <main class="flex-1 mx-auto max-w-6xl px-4 py-8">
+      <slot />
+    </main>
+
+    {ENABLE_WEBMCP && (
+      <script is:inline>
+        // WebMCP: expose site tools to AI agents
+        (function() {
+          if (!navigator.modelContext) return;
+          navigator.modelContext.registerTool({
+            name: "search-site",
+            description: "Search this site for a given query. Returns matching page titles and URLs.",
+            inputSchema: {
+              type: "object",
+              properties: {
+                query: { type: "string", description: "Search query" }
+              },
+              required: ["query"]
+            },
+            async execute({ query }) {
+              try {
+                const pagefind = await import("/pagefind/pagefind.js");
+                await pagefind.init();
+                const search = await pagefind.search(query);
+                const results = await Promise.all(search.results.slice(0, 5).map(r => r.data()));
+                return results.map(r => ({ title: r.meta?.title, url: r.url, excerpt: r.excerpt }));
+              } catch (e) {
+                return { results: [], message: "Search unavailable" };
+              }
+            }
+          });
+          navigator.modelContext.registerTool({
+            name: "get-page-content",
+            description: "Get the main text content of the current page as plain text.",
+            inputSchema: { type: "object", properties: {}, required: [] },
+            async execute() {
+              const main = document.querySelector("main");
+              return {
+                title: document.title,
+                url: window.location.href,
+                content: main ? main.innerText.slice(0, 4000) : document.body.innerText.slice(0, 4000)
+              };
+            }
+          });
+          navigator.modelContext.registerTool({
+            name: "navigate",
+            description: "Navigate to a page on this site by path.",
+            inputSchema: {
+              type: "object",
+              properties: {
+                path: { type: "string", description: "Site path to navigate to" }
+              },
+              required: ["path"]
+            },
+            async execute({ path }) {
+              window.location.href = path;
+              return { navigated: path };
+            }
+          });
+        })();
+      </script>
+    )}
+
+    {isDev && (
+      <script is:inline>
+        // postMessage bridge for cross-origin iframe communication (dev only)
+        (function() {
+          // Send page info to parent frame
+          function sendPageInfo() {
+            if (window.parent === window) return; // Not in iframe
+
+            const title = document.title || '';
+            const metaDesc = document.querySelector('meta[name="description"]')?.getAttribute('content') || '';
+            const url = window.location.href;
+
+            window.parent.postMessage({
+              type: 'hakuto:page-info',
+              title,
+              description: metaDesc,
+              url
+            }, '*');
+          }
+
+          // Send initial page info
+          sendPageInfo();
+
+          // Monitor title changes
+          const titleObserver = new MutationObserver(() => sendPageInfo());
+          titleObserver.observe(document.querySelector('title') || document.head, {
+            childList: true,
+            subtree: true
+          });
+
+          // Monitor meta description changes
+          const metaObserver = new MutationObserver(() => sendPageInfo());
+          const metaDesc = document.querySelector('meta[name="description"]');
+          if (metaDesc) {
+            metaObserver.observe(metaDesc, { attributes: true });
+          }
+
+          // Monitor URL changes (pushState/replaceState)
+          const originalPushState = history.pushState;
+          const originalReplaceState = history.replaceState;
+
+          history.pushState = function() {
+            originalPushState.apply(this, arguments);
+            sendPageInfo();
+          };
+
+          history.replaceState = function() {
+            originalReplaceState.apply(this, arguments);
+            sendPageInfo();
+          };
+
+          // Monitor URL changes (back/forward)
+          window.addEventListener('popstate', sendPageInfo);
+
+          console.log('[Hakuto] postMessage bridge initialized (dev mode)');
+        })();
+      </script>
+
+      <script is:inline>
+        // Custom element inspector (dev only)
+        // Uses data-astro-grab attributes already present on DOM elements
+        (function() {
+          if (window.parent === window) return;
+
+          let isInspecting = false;
+          let requestId = null;
+          let overlay = null;
+          let tooltip = null;
+          let currentTarget = null;
+
+          // Create overlay UI
+          function createOverlay() {
+            if (overlay) return;
+
+            // Highlight overlay
+            overlay = document.createElement('div');
+            overlay.id = 'hakuto-inspect-overlay';
+            overlay.style.cssText = `
+              position: fixed;
+              pointer-events: none;
+              border: 2px solid #3b82f6;
+              background: rgba(59, 130, 246, 0.1);
+              z-index: 999998;
+              transition: all 0.1s ease;
+              display: none;
+            `;
+
+            // Tooltip
+            tooltip = document.createElement('div');
+            tooltip.id = 'hakuto-inspect-tooltip';
+            tooltip.style.cssText = `
+              position: fixed;
+              background: #1e293b;
+              color: #f8fafc;
+              padding: 6px 10px;
+              border-radius: 6px;
+              font-family: ui-monospace, monospace;
+              font-size: 12px;
+              z-index: 999999;
+              pointer-events: none;
+              white-space: nowrap;
+              box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+              display: none;
+            `;
+
+            document.body.appendChild(overlay);
+            document.body.appendChild(tooltip);
+          }
+
+          function removeOverlay() {
+            overlay?.remove();
+            tooltip?.remove();
+            overlay = null;
+            tooltip = null;
+          }
+
+          function findGrabElement(el) {
+            while (el && el !== document.body) {
+              if (el.dataset && el.dataset.astroGrab) {
+                return el;
+              }
+              el = el.parentElement;
+            }
+            return null;
+          }
+
+          function updateHighlight(target) {
+            if (!target || !overlay || !tooltip) return;
+
+            const rect = target.getBoundingClientRect();
+            const source = target.dataset.astroGrab;
+
+            overlay.style.display = 'block';
+            overlay.style.top = rect.top + 'px';
+            overlay.style.left = rect.left + 'px';
+            overlay.style.width = rect.width + 'px';
+            overlay.style.height = rect.height + 'px';
+
+            tooltip.style.display = 'block';
+            tooltip.textContent = source;
+
+            // Position tooltip above element, or below if no room
+            const tooltipRect = tooltip.getBoundingClientRect();
+            if (rect.top > tooltipRect.height + 8) {
+              tooltip.style.top = (rect.top - tooltipRect.height - 8) + 'px';
+            } else {
+              tooltip.style.top = (rect.bottom + 8) + 'px';
+            }
+            tooltip.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - tooltipRect.width - 8)) + 'px';
+          }
+
+          function hideHighlight() {
+            if (overlay) overlay.style.display = 'none';
+            if (tooltip) tooltip.style.display = 'none';
+          }
+
+          function handleMouseMove(e) {
+            const target = findGrabElement(e.target);
+            if (target !== currentTarget) {
+              currentTarget = target;
+              if (target) {
+                updateHighlight(target);
+              } else {
+                hideHighlight();
+              }
+            }
+          }
+
+          function handleClick(e) {
+            if (!isInspecting) return;
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            const target = findGrabElement(e.target);
+            if (target) {
+              const source = target.dataset.astroGrab;
+              console.log('[Inspector] Selected:', source);
+
+              // Parse file:line:col format
+              const parts = source.split(':');
+              const col = parseInt(parts.pop(), 10);
+              const line = parseInt(parts.pop(), 10);
+              const file = parts.join(':');
+
+              window.parent.postMessage({
+                type: 'hakuto:inspect-result',
+                requestId: requestId,
+                file: file,
+                line: line,
+                column: col,
+                raw: source
+              }, '*');
+
+              stopInspecting();
+            }
+          }
+
+          function handleKeyDown(e) {
+            if (e.key === 'Escape' && isInspecting) {
+              console.log('[Inspector] Cancelled');
+              window.parent.postMessage({
+                type: 'hakuto:inspect-cancelled',
+                requestId: requestId
+              }, '*');
+              stopInspecting();
+            }
+          }
+
+          function startInspecting(reqId) {
+            if (isInspecting) return;
+
+            requestId = reqId;
+            isInspecting = true;
+            currentTarget = null;
+
+            createOverlay();
+            document.body.style.cursor = 'crosshair';
+
+            document.addEventListener('mousemove', handleMouseMove, true);
+            document.addEventListener('click', handleClick, true);
+            document.addEventListener('keydown', handleKeyDown, true);
+
+            console.log('[Inspector] Started');
+          }
+
+          function stopInspecting() {
+            if (!isInspecting) return;
+
+            isInspecting = false;
+            requestId = null;
+            currentTarget = null;
+
+            document.body.style.cursor = '';
+            document.removeEventListener('mousemove', handleMouseMove, true);
+            document.removeEventListener('click', handleClick, true);
+            document.removeEventListener('keydown', handleKeyDown, true);
+
+            removeOverlay();
+            console.log('[Inspector] Stopped');
+          }
+
+          // Listen for inspect request from parent
+          window.addEventListener('message', function(e) {
+            if (!e.data || e.data.type !== 'hakuto:inspect-start') return;
+            console.log('[Inspector] Received request:', e.data);
+            startInspecting(e.data.requestId);
+          });
+
+          console.log('[Inspector] Ready');
+        })();
+      </script>
+    )}
+  </body>
+</html>

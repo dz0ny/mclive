@@ -1,0 +1,251 @@
+// Shared MeshCore types + display helpers for the live dashboard.
+
+import { analyzeRaw, PAYLOAD_TYPE_ADVERT } from "../../worker/lib/decode.js";
+
+/** A logical packet (deduped by hash; heard by one or more observers). */
+export interface Packet {
+  id: number | null;
+  hash: string | null;
+  ts: string | null;
+  first_seen: number;
+  last_seen: number;
+  direction: string | null;
+  payload_type: number | null;
+  route: string | null;
+  len: number | null;
+  payload_len: number | null;
+  /** latest reception's path node-hash bytes (hex), e.g. ["a1","b2"] */
+  path: string[];
+  reception_count: number;
+  best_snr: number | null;
+  best_rssi: number | null;
+  /** full wire packet hex (present from the API and SSE; used to decode channels) */
+  raw?: string;
+}
+
+export interface Reception {
+  origin: string | null;
+  origin_id: string | null;
+  iata: string | null;
+  snr: number | null;
+  rssi: number | null;
+  path: string[];
+  received_at: number;
+  obs_lat?: number | null;
+  obs_lon?: number | null;
+}
+
+export interface DecodedWire {
+  route: string;
+  routeType: number;
+  payloadType: number;
+  version: number;
+  pathHashSize: number;
+  pathBytes: string[];
+  payloadOffset: number;
+  payloadLen: number;
+  payloadHex: string;
+}
+
+export interface Hop {
+  hash: string;
+  node: MeshNode | null;
+}
+
+export interface AdvertInfo {
+  pubkey: string;
+  hashPrefix: string;
+  advType: number;
+  hasLatLon: boolean;
+  lat: number | null;
+  lon: number | null;
+  name: string;
+  advTimestamp: number;
+}
+
+export interface PacketDetail {
+  packet: Packet;
+  decoded: DecodedWire | null;
+  hops: Hop[];
+  receptions: Reception[];
+  advert: AdvertInfo | null;
+  advertNode: MeshNode | null;
+}
+
+export interface MeshNode {
+  pubkey: string;
+  hash_prefix: string;
+  name: string | null;
+  adv_type: number | null;
+  lat: number;
+  lon: number;
+  last_advert_ts: number | null;
+  updated_at: number;
+}
+
+export interface Device {
+  origin_id: string;
+  origin: string | null;
+  iata: string | null;
+  lat: number | null;
+  lon: number | null;
+  last_seen: number;
+  /** "advert" if location came from the device's self-advert, else "iata" */
+  loc_source?: "advert" | "iata";
+}
+
+export const PAYLOAD_TYPE_NAMES: Record<number, string> = {
+  0: "REQ",
+  1: "RESPONSE",
+  2: "TXT",
+  3: "ACK",
+  4: "ADVERT",
+  5: "GRP_TXT",
+  6: "GRP_DATA",
+  7: "ANON_REQ",
+  8: "PATH",
+  9: "TRACE",
+  10: "MULTIPART",
+  11: "CONTROL",
+  15: "RAW_CUSTOM",
+};
+
+export function payloadTypeName(t: number | null | undefined): string {
+  if (t === null || t === undefined) return "?";
+  return PAYLOAD_TYPE_NAMES[t] ?? `T${t}`;
+}
+
+export const ROUTE_LABELS: Record<string, string> = {
+  F: "Flood",
+  D: "Direct",
+  T: "Transport",
+  U: "Unknown",
+};
+
+export function routeLabel(r: string | null | undefined): string {
+  if (!r) return "—";
+  return ROUTE_LABELS[r] ?? r;
+}
+
+/** What each payload type means (from the MeshCore firmware's Packet.h). */
+export const PAYLOAD_TYPE_DESCRIPTIONS: Record<number, string> = {
+  0: "An encrypted request to a specific node (login, status or telemetry query). Only the destination node can decrypt it.",
+  1: "An encrypted response to an earlier request — only the requesting node can read it.",
+  2: "A private text message between two nodes, end-to-end encrypted with their shared secret.",
+  3: "A tiny acknowledgement confirming a message was delivered.",
+  4: "A node announcing its identity: public key, signed timestamp, name, node type and (optionally) its location. This is how the mesh learns who is out there.",
+  5: "A group chat message on a channel. Encrypted with the channel's shared key — anyone holding the key (e.g. Public or a #hashtag) can decode it.",
+  6: "A group datagram: arbitrary application data shared on a channel, encrypted like group text.",
+  7: "An anonymous request carrying an ephemeral public key — used e.g. to log in to a room server without being a known contact.",
+  8: "A returned route: tells the original sender which path to use to reach a node directly instead of flooding.",
+  9: "A diagnostic traceroute along a fixed path — each repeater appends its measured SNR, mapping link quality hop by hop.",
+  10: "One part of a larger payload that was split across multiple packets.",
+  11: "A control/discovery packet used internally by the mesh.",
+  15: "Raw custom bytes for applications that bring their own encryption and format.",
+};
+
+export function payloadTypeDescription(t: number | null | undefined): string {
+  if (t === null || t === undefined) return "Unknown packet type.";
+  return PAYLOAD_TYPE_DESCRIPTIONS[t] ?? `Unknown packet type (${t}).`;
+}
+
+export const ROUTE_DESCRIPTIONS: Record<string, string> = {
+  F: "Flood routing: every repeater that hears it rebroadcasts it, and each hop appends its hash to the path.",
+  D: "Direct routing: the packet follows a predetermined path of repeaters instead of flooding the whole mesh.",
+  T: "Transport routing: flood/direct delivery scoped with transport codes (regional keys).",
+  U: "Unknown routing mode.",
+};
+
+/** Badge classes per payload type (light + dark variants). */
+export const PAYLOAD_TYPE_BADGE: Record<number, string> = {
+  0: "border-amber-300 bg-amber-100 text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300",
+  1: "border-lime-300 bg-lime-100 text-lime-800 dark:border-lime-500/40 dark:bg-lime-500/15 dark:text-lime-300",
+  2: "border-blue-300 bg-blue-100 text-blue-800 dark:border-blue-500/40 dark:bg-blue-500/15 dark:text-blue-300",
+  3: "border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-500/40 dark:bg-slate-500/15 dark:text-slate-300",
+  4: "border-emerald-300 bg-emerald-100 text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-300",
+  5: "border-violet-300 bg-violet-100 text-violet-800 dark:border-violet-500/40 dark:bg-violet-500/15 dark:text-violet-300",
+  6: "border-purple-300 bg-purple-100 text-purple-800 dark:border-purple-500/40 dark:bg-purple-500/15 dark:text-purple-300",
+  7: "border-orange-300 bg-orange-100 text-orange-800 dark:border-orange-500/40 dark:bg-orange-500/15 dark:text-orange-300",
+  8: "border-cyan-300 bg-cyan-100 text-cyan-800 dark:border-cyan-500/40 dark:bg-cyan-500/15 dark:text-cyan-300",
+  9: "border-pink-300 bg-pink-100 text-pink-800 dark:border-pink-500/40 dark:bg-pink-500/15 dark:text-pink-300",
+  10: "border-stone-300 bg-stone-100 text-stone-700 dark:border-stone-500/40 dark:bg-stone-500/15 dark:text-stone-300",
+  11: "border-yellow-300 bg-yellow-100 text-yellow-800 dark:border-yellow-500/40 dark:bg-yellow-500/15 dark:text-yellow-300",
+  15: "border-red-300 bg-red-100 text-red-800 dark:border-red-500/40 dark:bg-red-500/15 dark:text-red-300",
+};
+
+export function typeBadgeClass(t: number | null | undefined): string {
+  return (t != null && PAYLOAD_TYPE_BADGE[t]) || "border-border bg-muted text-muted-foreground";
+}
+
+/** Badge classes per route mode. */
+export const ROUTE_BADGE: Record<string, string> = {
+  F: "border-orange-300 bg-orange-100 text-orange-800 dark:border-orange-500/40 dark:bg-orange-500/15 dark:text-orange-300",
+  D: "border-emerald-300 bg-emerald-100 text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-300",
+  T: "border-indigo-300 bg-indigo-100 text-indigo-800 dark:border-indigo-500/40 dark:bg-indigo-500/15 dark:text-indigo-300",
+};
+
+export function routeBadgeClass(r: string | null | undefined): string {
+  return (r && ROUTE_BADGE[r]) || "border-border bg-muted text-muted-foreground";
+}
+
+/** Stable-ish color per node hash byte for trace lines / markers. */
+export function hashColor(hashByte: string): string {
+  const n = parseInt(hashByte, 16);
+  const hue = (Number.isNaN(n) ? 0 : n) * 1.41 % 360;
+  return `hsl(${hue.toFixed(0)} 80% 55%)`;
+}
+
+/**
+ * Resolve a path hash to a node. Path hashes are 1–4 bytes (the leading bytes
+ * of the sender's pubkey), so match by pubkey prefix rather than a fixed byte.
+ */
+export function nodeForHash(hash: string, nodes: MeshNode[]): MeshNode | null {
+  if (!hash) return null;
+  const h = hash.toLowerCase();
+  for (const n of nodes) {
+    if (n.pubkey.toLowerCase().startsWith(h)) return n;
+  }
+  return null;
+}
+
+/**
+ * Resolve the originating node's display name for a packet.
+ *
+ * For an ADVERT the sender is the identity carried *inside* the packet (the
+ * advertised pubkey + name decoded from `raw`), not a path hash — adverts flood
+ * from their origin with an empty path, so `path[0]` is absent. For every other
+ * payload type the sender is the first path hash (a 1–4 byte pubkey prefix),
+ * resolved against the known-node directory.
+ *
+ * Returns null when the sender can't be determined (unknown relay, no raw).
+ */
+export function senderName(p: Packet, nodes: MeshNode[]): string | null {
+  if (p.payload_type === PAYLOAD_TYPE_ADVERT && p.raw) {
+    const { advert } = analyzeRaw(p.raw);
+    if (advert) {
+      // Prefer the node directory's name, then the advert's own name, then a
+      // short pubkey so an unnamed/location-less advert still attributes.
+      const known = nodes.find((n) => n.pubkey.toLowerCase() === advert.pubkey.toLowerCase());
+      return known?.name || advert.name || advert.pubkey.slice(0, 12);
+    }
+  }
+  if (!nodes.length || p.path.length === 0) return null;
+  return nodeForHash(p.path[0], nodes)?.name ?? null;
+}
+
+export function formatTime(epochMs: number): string {
+  const d = new Date(epochMs);
+  return d.toLocaleTimeString(undefined, { hour12: false });
+}
+
+export function formatDateTime(epochMs: number): string {
+  return new Date(epochMs).toLocaleString(undefined, { hour12: false });
+}
+
+export const ADV_TYPE_NAMES: Record<number, string> = {
+  0: "none",
+  1: "chat",
+  2: "repeater",
+  3: "room",
+  4: "sensor",
+};

@@ -1,0 +1,451 @@
+@import 'tailwindcss';
+
+@plugin 'tailwindcss-animate';
+
+@custom-variant dark (&:is(.dark *));
+
+@utility container {
+  margin-inline: auto;
+  padding-inline: 2rem;
+  @media (width >= --theme(--breakpoint-sm)) {
+    max-width: none;
+  }
+  @media (width >= 1400px) {
+    max-width: 1400px;
+  }
+}
+
+@theme {
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --color-sidebar: hsl(var(--sidebar-background));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-primary: hsl(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-ring: hsl(var(--sidebar-ring));
+
+  --color-brand-primary: hsl(var(--brand-primary));
+  --color-brand-accent: hsl(var(--brand-accent));
+  --color-brand-accent-foreground: hsl(var(--brand-accent-foreground));
+
+  --color-chart-1: hsl(var(--chart-1));
+  --color-chart-2: hsl(var(--chart-2));
+  --color-chart-3: hsl(var(--chart-3));
+  --color-chart-4: hsl(var(--chart-4));
+  --color-chart-5: hsl(var(--chart-5));
+
+  --background-image-gradient-hero: var(--gradient-hero);
+  --background-image-gradient-cta: var(--gradient-cta);
+
+  --shadow-soft: var(--shadow-soft);
+  --shadow-medium: var(--shadow-medium);
+  --shadow-strong: var(--shadow-strong);
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+    to {
+      height: 0;
+    }
+  }
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+/* Nord theme (https://nordtheme.com) — Nord Light + Polar Night dark */
+@layer base {
+  :root {
+    --background: 218 27% 94%; /* nord6 snow storm */
+    --foreground: 220 16% 22%; /* nord0 polar night */
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 16% 22%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 16% 22%;
+
+    --primary: 213 32% 52%; /* nord10 frost blue */
+    --primary-foreground: 218 27% 94%;
+
+    --secondary: 219 28% 88%; /* nord4 */
+    --secondary-foreground: 220 16% 22%;
+
+    --muted: 218 27% 90%;
+    --muted-foreground: 220 16% 41%;
+
+    --accent: 219 28% 88%;
+    --accent-foreground: 220 16% 22%;
+
+    /* Brand colors (frost) */
+    --brand-primary: 213 32% 52%; /* nord10 */
+    --brand-accent: 193 43% 67%; /* nord8 */
+    --brand-accent-foreground: 220 16% 22%;
+
+    /* Gradients */
+    --gradient-hero: linear-gradient(135deg, hsl(193 43% 67% / 0.12), hsl(218 27% 96%));
+    --gradient-cta: linear-gradient(135deg, hsl(193 43% 67%), hsl(210 34% 63%));
+
+    /* Shadows */
+    --shadow-soft: 0 2px 20px hsl(220 16% 22% / 0.08);
+    --shadow-medium: 0 8px 30px hsl(220 16% 22% / 0.12);
+    --shadow-strong: 0 15px 40px hsl(220 16% 22% / 0.15);
+
+    --destructive: 354 42% 56%; /* nord11 aurora red */
+    --destructive-foreground: 218 27% 94%;
+
+    --border: 219 20% 84%;
+    --input: 219 20% 84%;
+    --ring: 213 32% 52%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 220 16% 28%;
+    --sidebar-primary: 213 32% 52%;
+    --sidebar-primary-foreground: 218 27% 94%;
+    --sidebar-accent: 218 27% 92%;
+    --sidebar-accent-foreground: 220 16% 22%;
+    --sidebar-border: 219 20% 86%;
+    --sidebar-ring: 213 32% 52%;
+
+    /* Aurora + frost charts */
+    --chart-1: 213 32% 52%; /* nord10 */
+    --chart-2: 179 25% 55%; /* nord7 */
+    --chart-3: 92 28% 55%; /* nord14 green */
+    --chart-4: 40 71% 60%; /* nord13 yellow */
+    --chart-5: 311 20% 55%; /* nord15 purple */
+  }
+
+  .dark {
+    --background: 220 16% 22%; /* nord0 */
+    --foreground: 218 27% 94%; /* nord6 */
+
+    --card: 222 16% 28%; /* nord1 */
+    --card-foreground: 218 27% 94%;
+
+    --popover: 222 16% 28%;
+    --popover-foreground: 218 27% 94%;
+
+    --primary: 193 43% 67%; /* nord8 frost cyan */
+    --primary-foreground: 220 16% 22%;
+
+    --secondary: 220 17% 32%; /* nord2 */
+    --secondary-foreground: 218 27% 94%;
+
+    --muted: 220 17% 32%;
+    --muted-foreground: 219 18% 70%;
+
+    --accent: 220 16% 36%; /* nord3 */
+    --accent-foreground: 218 27% 94%;
+
+    /* Brand colors (frost) */
+    --brand-primary: 193 43% 67%; /* nord8 */
+    --brand-accent: 210 34% 63%; /* nord9 */
+    --brand-accent-foreground: 220 16% 22%;
+
+    /* Dark mode gradients */
+    --gradient-hero: linear-gradient(135deg, hsl(193 43% 67% / 0.08), hsl(220 16% 18%));
+    --gradient-cta: linear-gradient(135deg, hsl(193 43% 67%), hsl(210 34% 63%));
+
+    /* Dark mode shadows */
+    --shadow-soft: 0 2px 20px hsl(220 16% 10% / 0.4);
+    --shadow-medium: 0 8px 30px hsl(220 16% 10% / 0.5);
+    --shadow-strong: 0 15px 40px hsl(220 16% 10% / 0.6);
+
+    --destructive: 354 42% 56%; /* nord11 */
+    --destructive-foreground: 218 27% 94%;
+
+    --border: 220 17% 32%;
+    --input: 220 16% 36%;
+    --ring: 193 43% 67%;
+
+    --sidebar-background: 222 16% 25%;
+    --sidebar-foreground: 218 27% 92%;
+    --sidebar-primary: 193 43% 67%;
+    --sidebar-primary-foreground: 220 16% 22%;
+    --sidebar-accent: 220 17% 32%;
+    --sidebar-accent-foreground: 218 27% 94%;
+    --sidebar-border: 220 17% 30%;
+    --sidebar-ring: 193 43% 67%;
+
+    /* Aurora charts */
+    --chart-1: 193 43% 67%; /* nord8 */
+    --chart-2: 92 28% 65%; /* nord14 */
+    --chart-3: 40 71% 73%; /* nord13 */
+    --chart-4: 311 20% 63%; /* nord15 */
+    --chart-5: 354 42% 56%; /* nord11 */
+  }
+
+  /* ---- Alternate palettes (picked via data-theme on <html>; Nord is the
+     default above). Each has a light base + .dark variant. ---- */
+
+  /* Tokyo Night (Day / Night) */
+  html[data-theme="tokyo"] {
+    --background: 228 21% 89%;
+    --foreground: 229 26% 27%;
+    --card: 0 0% 100%;
+    --card-foreground: 229 26% 27%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 229 26% 27%;
+    --primary: 223 56% 48%;
+    --primary-foreground: 228 21% 95%;
+    --secondary: 228 16% 84%;
+    --secondary-foreground: 229 26% 27%;
+    --muted: 228 18% 86%;
+    --muted-foreground: 228 12% 42%;
+    --accent: 228 16% 84%;
+    --accent-foreground: 229 26% 27%;
+    --destructive: 343 91% 56%;
+    --destructive-foreground: 228 21% 95%;
+    --border: 228 14% 80%;
+    --input: 228 14% 80%;
+    --ring: 223 56% 48%;
+  }
+  html[data-theme="tokyo"].dark {
+    --background: 235 19% 13%;
+    --foreground: 229 73% 86%;
+    --card: 233 18% 17%;
+    --card-foreground: 229 73% 86%;
+    --popover: 233 18% 17%;
+    --popover-foreground: 229 73% 86%;
+    --primary: 221 89% 72%;
+    --primary-foreground: 235 19% 13%;
+    --secondary: 233 18% 22%;
+    --secondary-foreground: 229 73% 86%;
+    --muted: 233 18% 22%;
+    --muted-foreground: 230 14% 58%;
+    --accent: 233 18% 26%;
+    --accent-foreground: 229 73% 86%;
+    --destructive: 349 89% 72%;
+    --destructive-foreground: 235 19% 13%;
+    --border: 233 18% 24%;
+    --input: 233 18% 26%;
+    --ring: 221 89% 72%;
+  }
+
+  /* Catppuccin (Latte / Mocha) */
+  html[data-theme="catppuccin"] {
+    --background: 220 23% 95%;
+    --foreground: 234 16% 35%;
+    --card: 0 0% 100%;
+    --card-foreground: 234 16% 35%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 234 16% 35%;
+    --primary: 266 85% 58%;
+    --primary-foreground: 220 23% 95%;
+    --secondary: 223 16% 83%;
+    --secondary-foreground: 234 16% 35%;
+    --muted: 223 16% 88%;
+    --muted-foreground: 233 10% 47%;
+    --accent: 223 16% 83%;
+    --accent-foreground: 234 16% 35%;
+    --destructive: 347 87% 44%;
+    --destructive-foreground: 220 23% 95%;
+    --border: 223 14% 77%;
+    --input: 223 14% 77%;
+    --ring: 266 85% 58%;
+  }
+  html[data-theme="catppuccin"].dark {
+    --background: 240 21% 15%;
+    --foreground: 226 64% 88%;
+    --card: 237 16% 20%;
+    --card-foreground: 226 64% 88%;
+    --popover: 237 16% 20%;
+    --popover-foreground: 226 64% 88%;
+    --primary: 267 84% 81%;
+    --primary-foreground: 240 21% 15%;
+    --secondary: 237 16% 23%;
+    --secondary-foreground: 226 64% 88%;
+    --muted: 237 16% 23%;
+    --muted-foreground: 228 24% 72%;
+    --accent: 234 13% 31%;
+    --accent-foreground: 226 64% 88%;
+    --destructive: 343 81% 75%;
+    --destructive-foreground: 240 21% 15%;
+    --border: 237 16% 23%;
+    --input: 234 13% 31%;
+    --ring: 267 84% 81%;
+  }
+
+  /* Rosé Pine (Dawn / Main) */
+  html[data-theme="rosepine"] {
+    --background: 32 57% 95%;
+    --foreground: 248 19% 40%;
+    --card: 35 100% 98%;
+    --card-foreground: 248 19% 40%;
+    --popover: 35 100% 98%;
+    --popover-foreground: 248 19% 40%;
+    --primary: 3 53% 67%;
+    --primary-foreground: 32 57% 97%;
+    --secondary: 28 40% 92%;
+    --secondary-foreground: 248 19% 40%;
+    --muted: 28 40% 92%;
+    --muted-foreground: 249 12% 52%;
+    --accent: 10 9% 86%;
+    --accent-foreground: 248 19% 40%;
+    --destructive: 343 35% 55%;
+    --destructive-foreground: 32 57% 97%;
+    --border: 10 9% 86%;
+    --input: 10 9% 86%;
+    --ring: 3 53% 67%;
+  }
+  html[data-theme="rosepine"].dark {
+    --background: 249 22% 12%;
+    --foreground: 245 50% 91%;
+    --card: 247 23% 15%;
+    --card-foreground: 245 50% 91%;
+    --popover: 247 23% 15%;
+    --popover-foreground: 245 50% 91%;
+    --primary: 2 55% 83%;
+    --primary-foreground: 249 22% 12%;
+    --secondary: 248 25% 18%;
+    --secondary-foreground: 245 50% 91%;
+    --muted: 248 25% 18%;
+    --muted-foreground: 245 13% 61%;
+    --accent: 249 15% 28%;
+    --accent-foreground: 245 50% 91%;
+    --destructive: 343 76% 68%;
+    --destructive-foreground: 249 22% 12%;
+    --border: 248 25% 18%;
+    --input: 249 15% 28%;
+    --ring: 2 55% 83%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* OpenLayers map chrome — themed to match the dashboard.
+   NOT wrapped in @layer: ol.css ships unlayered, and unlayered rules always win
+   over @layer rules in the cascade. So these must also be unlayered, with a
+   specificity bump (.ol-control.X) on the positional overrides to beat ol.css. */
+.ol-control button {
+  background-color: hsl(var(--background) / 0.85);
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
+  font-weight: 600;
+}
+.ol-control button:hover,
+.ol-control button:focus {
+  background-color: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+}
+/* zoom buttons bottom-right so the top-left overlay never covers them */
+.ol-control.ol-zoom {
+  top: auto;
+  left: auto;
+  bottom: 0.5em;
+  right: 0.5em;
+}
+/* basemap switcher, stacked above the zoom control */
+.ol-control.mclive-basemap {
+  top: auto;
+  left: auto;
+  bottom: 4em;
+  right: 0.5em;
+}
+.mclive-basemap select {
+  background-color: hsl(var(--background) / 0.85);
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.375rem;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.75rem;
+}
+/* attribution to bottom-left so it never collides with the bottom-right
+   zoom + basemap controls (!important to beat ol.css's own anchored rule) */
+.ol-control.ol-attribution {
+  left: 0.5em !important;
+  right: auto !important;
+  bottom: 0.5em !important;
+  background-color: hsl(var(--background) / 0.7);
+}
+.ol-attribution ul {
+  color: hsl(var(--muted-foreground));
+}
+.mclive-tooltip {
+  pointer-events: none;
+  white-space: nowrap;
+  background-color: hsl(var(--popover));
+  color: hsl(var(--popover-foreground));
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.375rem;
+  padding: 0.2rem 0.45rem;
+  font-size: 0.75rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
