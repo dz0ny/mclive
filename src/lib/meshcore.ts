@@ -113,6 +113,39 @@ export interface Observer {
   last_packet_at: number | null;
 }
 
+/** The advertised node's pubkey for an ADVERT packet (decoded from raw), else null. */
+export function advertPubkey(p: Packet): string | null {
+  if (p.payload_type === PAYLOAD_TYPE_ADVERT && p.raw) {
+    const { advert } = analyzeRaw(p.raw);
+    return advert?.pubkey ?? null;
+  }
+  return null;
+}
+
+/**
+ * Match a packet against a sender filter query. Hex token(s) (space-separated,
+ * 1–4 bytes each, e.g. "a3 7f", "baba cfcf", "a1b2c3") match the packet's path
+ * hops (prefix either way, so any network hash size works) or — for path-less
+ * adverts — the advertised pubkey prefix. A non-hex query matches the resolved
+ * sender name (substring).
+ */
+export function matchesSenderQuery(p: Packet, query: string, nodes: MeshNode[]): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const tokens = q.split(/\s+/);
+  const allHex = tokens.every((t) => t.length >= 2 && t.length <= 8 && t.length % 2 === 0 && /^[0-9a-f]+$/.test(t));
+  if (allHex) {
+    const path = p.path.map((h) => h.toLowerCase());
+    const advPk = advertPubkey(p)?.toLowerCase() ?? null;
+    return tokens.some(
+      (h) =>
+        path.some((t) => t.startsWith(h) || h.startsWith(t)) ||
+        (advPk != null && advPk.startsWith(h))
+    );
+  }
+  return (senderName(p, nodes) ?? "").toLowerCase().includes(q);
+}
+
 export type ObserverStatus = "online" | "stale" | "offline";
 
 /** Liveness from the most recent of any signal (status, packet, last_seen). */

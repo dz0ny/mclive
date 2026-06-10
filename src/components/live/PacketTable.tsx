@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { MeshNode, Packet } from "@/lib/meshcore";
 import {
   formatTime,
+  matchesSenderQuery,
   payloadTypeName,
   routeBadgeClass,
   routeLabel,
@@ -52,10 +53,9 @@ export default function PacketTable({ packets, selectedId, nodes, onSelect }: Pr
   }, [packets]);
 
   const rows = useMemo(() => {
-    const s = sender.trim().toLowerCase();
     const pq = pathQ.trim().toLowerCase();
     return packets.filter((p) => {
-      if (s && !(packetNode(p, nodes) ?? "").toLowerCase().includes(s)) return false;
+      if (sender.trim() && !matchesSenderQuery(p, sender, nodes ?? [])) return false;
       if (pq && !p.path.some((h) => h.toLowerCase().includes(pq))) return false;
       if (types.size && (p.payload_type == null || !types.has(p.payload_type))) return false;
       if (routes.size && (!p.route || !routes.has(p.route))) return false;
@@ -74,7 +74,7 @@ export default function PacketTable({ packets, selectedId, nodes, onSelect }: Pr
                 label="Sender"
                 value={sender}
                 onChange={setSender}
-                placeholder="Filter by node name…"
+                placeholder="Name, or hash(es): a3 7f, baba…"
               />
             </TableHead>
             <TableHead>
