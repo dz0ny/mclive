@@ -8,18 +8,27 @@ to D1, and fans out to the live page over SSE (`/~/stream`).
 
 ## Point a real device at the Worker
 
-### Firmware patch (one-time)
+### Firmware (one-time)
 
-Stock MeshCore builds the custom broker URI as `mqtt://host:port` (raw TCP),
-which a Cloudflare Worker can't accept — Workers only speak MQTT-over-WebSocket.
-The patch in `~/mc-mq` (`src/helpers/bridges/MQTTBridge.{h,cpp}`, helper
-`buildBrokerURI`) makes the firmware use the configured server **verbatim when it
-already contains a URI scheme**, so you can set a `wss://…/mqtt` endpoint.
+The firmware in `~/mc-mq` configures each destination as a single **DSN URL** and
+can fan out to up to **3** brokers at once (`mqtt.url0`, `mqtt.url1`, `mqtt.url2`),
+each with its own client. A DSN is:
 
-TLS: the custom-broker path configures no CA cert, so esp-tls **skips server
-certificate verification** (accepts any cert) — no cert management needed.
+```
+scheme://[user:password@]host[:port][/path]
+```
 
-Rebuild + flash the observer firmware, e.g.:
+Schemes & default ports: `mqtt`→1883, `mqtts`→8883, `ws`→80, `wss`→443. The DSN
+is parsed once into the broker's connection URI + credentials (helper `parseDSN`
+in `src/helpers/bridges/MQTTBridge.{h,cpp}`); changing it takes effect live, no
+reboot required.
+
+TLS: for the secure schemes (`wss`/`mqtts`) the firmware attaches the standard
+Arduino root-CA bundle, so a publicly-trusted cert (e.g. the Worker's Cloudflare
+cert) **validates automatically** — no per-cert configuration. Plaintext `ws`/
+`mqtt` schemes use no TLS.
+
+Build + flash the observer firmware, e.g.:
 
 ```bash
 cd ~/mc-mq && pio run -e Heltec_v3_repeater_observer_mqtt -t upload
@@ -27,14 +36,12 @@ cd ~/mc-mq && pio run -e Heltec_v3_repeater_observer_mqtt -t upload
 
 ### Device console config
 
-Set the custom MQTT server to the Worker's WS endpoint plus credentials (the
-password must match the Worker's `INGEST_TOKEN`; a username is required for the
-firmware to send credentials at all):
+Fold the Worker's WS endpoint **and** credentials into one DSN. The password must
+match the Worker's `INGEST_TOKEN`; a username is required for the firmware to send
+credentials at all:
 
 ```
-set mqtt.server wss://<your-worker-host>/mqtt
-set mqtt.username observer
-set mqtt.password <INGEST_TOKEN>
+set mqtt.url0 wss://observer:<INGEST_TOKEN>@<your-worker-host>/mqtt
 set mqtt.iata SEA
 set bridge.source rx
 reboot
@@ -42,10 +49,17 @@ reboot
 
 Notes:
 - Use the top-level `/mqtt` path (added to `run_worker_first`); `/~/mqtt` also works.
-- The port is set internally from the scheme (`wss`→443, `ws`→80), so no
-  separate `mqtt.port` is needed. Override it by encoding a port in the URI,
-  e.g. `wss://host:8884/mqtt`.
-- For a plaintext/local broker use `ws://<host>/mqtt` (no TLS).
+- The port comes from the scheme (`wss`→443, `ws`→80); override it by encoding a
+  port in the DSN, e.g. `wss://observer:<token>@host:8884/mqtt`.
+- For a plaintext/local broker use `ws://observer:<token>@<host>/mqtt` (no TLS).
+- To mirror to a second sink, add `set mqtt.url1 <dsn>` (and `mqtt.url2`). Clear a
+  slot with an empty value, e.g. `set mqtt.url1`.
+- `get mqtt.urlN` echoes the DSN verbatim (password included); `get mqtt.status`
+  shows `brokers: N/M connected`.
+
+> The old per-field keys (`mqtt.server` / `mqtt.port` / `mqtt.username` /
+> `mqtt.password`) and the built-in "Let's Mesh Analyzer" US/EU uplinks were
+> removed — everything is a DSN now.
 
 ## Replay synthetic data (no device needed)
 
