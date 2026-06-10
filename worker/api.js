@@ -175,6 +175,28 @@ api.get("/stats", async (c) => {
   });
 });
 
+// Observer Status: one row per observing device, with its latest /status report
+// plus reception aggregates (total + last hour + most-recent). Drives the
+// Observer Status dashboard.
+api.get("/observers", async (c) => {
+  const db = c.env.DB;
+  const hourAgo = Date.now() - 3600000;
+  const rows = await db
+    .prepare(
+      `SELECT d.origin_id, d.origin, d.iata, d.lat, d.lon, d.last_seen,
+              d.last_status_at, d.uptime_secs, d.firmware_version, d.model,
+              d.battery_mv, d.clock_offset_ms,
+              (SELECT COUNT(*) FROM receptions r WHERE r.origin_id = d.origin_id) AS total_packets,
+              (SELECT COUNT(*) FROM receptions r WHERE r.origin_id = d.origin_id AND r.received_at >= ?) AS packets_last_hour,
+              (SELECT MAX(received_at) FROM receptions r WHERE r.origin_id = d.origin_id) AS last_packet_at
+         FROM devices d
+        ORDER BY d.last_seen DESC`
+    )
+    .bind(hourAgo)
+    .all();
+  return c.json({ observers: rows.results || [] });
+});
+
 function withPathArray(row) {
   return { ...row, path: row.path ? String(row.path).split(",").filter(Boolean) : [] };
 }

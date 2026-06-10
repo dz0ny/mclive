@@ -133,7 +133,7 @@ export class PacketHub {
     const segs = pkt.topic.split("/");
     const iata = segs[0] === "meshcore" ? segs[1] : null;
     const leaf = segs[segs.length - 1];
-    if (leaf && leaf !== "packets") return; // ignore status/raw topics
+    if (leaf !== "packets" && leaf !== "status") return; // ignore /raw
     let msg;
     try {
       msg = JSON.parse(decoder.decode(pkt.payload));
@@ -141,7 +141,62 @@ export class PacketHub {
       return;
     }
     if (iata && !msg.iata) msg.iata = iata;
-    await this.ingestPacket(msg);
+    if (leaf === "status") {
+      await this.ingestStatus(msg);
+    } else {
+      await this.ingestPacket(msg);
+    }
+  }
+
+  /**
+   * Persist an observer's /status report. Payload (observer firmware):
+   * { status, timestamp, origin, origin_id, model, firmware_version, radio,
+   *   client_version, stats: { uptime_secs, battery_mv, noise_floor, ... } }.
+   * Updates the device row's status columns + last_seen so the Observer Status
+   * dashboard can show uptime, firmware, clock offset and liveness.
+   */
+  async ingestStatus(msg) {
+    const originId = msg.origin_id || null;
+    if (!originId) return;
+    const now = Date.now();
+    const origin = msg.origin || null;
+    const iata = msg.iata || null;
+    const stats = msg.stats || {};
+    const uptime = Number.isFinite(stats.uptime_secs) ? stats.uptime_secs : null;
+    const battery = Number.isFinite(stats.battery_mv) ? stats.battery_mv : null;
+    const fw = msg.firmware_version || null;
+    const model = msg.model || null;
+    // Clock offset: how far the device's reported time is from the server's.
+    const devMs = msg.timestamp ? Date.parse(msg.timestamp) : NaN;
+    const clockOffset = Number.isFinite(devMs) ? now - devMs : null;
+    const loc = iataLatLon(iata);
+    try {
+      await this.env.DB.prepare(
+        `INSERT INTO devices
+          (origin_id, origin, iata, lat, lon, last_seen,
+           last_status_at, uptime_secs, firmware_version, model, battery_mv, clock_offset_ms)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+         ON CONFLICT(origin_id) DO UPDATE SET
+           origin=COALESCE(excluded.origin, origin),
+           iata=COALESCE(excluded.iata, iata),
+           lat=COALESCE(excluded.lat, lat),
+           lon=COALESCE(excluded.lon, lon),
+           last_seen=excluded.last_seen,
+           last_status_at=excluded.last_status_at,
+           uptime_secs=excluded.uptime_secs,
+           firmware_version=excluded.firmware_version,
+           model=excluded.model,
+           battery_mv=excluded.battery_mv,
+           clock_offset_ms=excluded.clock_offset_ms`
+      )
+        .bind(
+          originId, origin, iata, loc?.[0] ?? null, loc?.[1] ?? null, now,
+          now, uptime, fw, model, battery, clockOffset
+        )
+        .run();
+    } catch (err) {
+      console.error("status upsert failed:", err);
+    }
   }
 
   // --- SSE stream (to browsers) ---------------------------------------------

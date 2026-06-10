@@ -94,6 +94,60 @@ export interface Device {
   loc_source?: "advert" | "iata";
 }
 
+/** An observing device with its latest /status report + reception aggregates. */
+export interface Observer {
+  origin_id: string;
+  origin: string | null;
+  iata: string | null;
+  lat: number | null;
+  lon: number | null;
+  last_seen: number;
+  last_status_at: number | null;
+  uptime_secs: number | null;
+  firmware_version: string | null;
+  model: string | null;
+  battery_mv: number | null;
+  clock_offset_ms: number | null;
+  total_packets: number;
+  packets_last_hour: number;
+  last_packet_at: number | null;
+}
+
+export type ObserverStatus = "online" | "stale" | "offline";
+
+/** Liveness from the most recent of any signal (status, packet, last_seen). */
+export function observerStatus(o: Observer, now = Date.now()): ObserverStatus {
+  const ref = Math.max(o.last_seen || 0, o.last_packet_at || 0, o.last_status_at || 0);
+  const age = now - ref;
+  if (age < 120_000) return "online"; // < 2 min
+  if (age < 900_000) return "stale"; // < 15 min
+  return "offline";
+}
+
+/** Compact "22s ago" / "5m ago" / "11d 17h" style relative time. */
+export function formatAgo(ms: number | null | undefined, now = Date.now()): string {
+  if (!ms) return "—";
+  const s = Math.max(0, Math.round((now - ms) / 1000));
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ${m % 60}m ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ${h % 24}h ago`;
+}
+
+/** Device uptime "16m" / "22h 44m" / "11d 17h". */
+export function formatUptime(secs: number | null | undefined): string {
+  if (secs == null || secs < 0) return "—";
+  const m = Math.floor(secs / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ${m % 60}m`;
+  const d = Math.floor(h / 24);
+  return `${d}d ${h % 24}h`;
+}
+
 export const PAYLOAD_TYPE_NAMES: Record<number, string> = {
   0: "REQ",
   1: "RESPONSE",

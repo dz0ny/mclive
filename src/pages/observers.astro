@@ -1,0 +1,8 @@
+---
+import AppLayout from "@/layouts/AppLayout.astro";
+import Observers from "@/components/live/Observers";
+---
+
+<AppLayout title="Observers">
+  <Observers client:only="react" />
+</AppLayout>
