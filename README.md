@@ -1,6 +1,10 @@
-# Your Hakuto Site
+# MeshCore Observatory
 
-Scaffolded by [Hakuto](https://hakuto.dev/), a Claude Code plugin for building Astro sites with shadcn/ui and Cloudflare Workers.
+A live LoRa mesh observatory — observer firmware uplinks MeshCore packets over MQTT-over-WebSocket to a Cloudflare Worker (`PacketHub` Durable Object), which decodes them into D1 and streams nodes, packets, adverts, channels and observer status to the web app (Astro + OpenLayers + shadcn/ui).
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/dz0ny/mclive)
+
+> Scaffolded by [Hakuto](https://hakuto.dev/), a Claude Code plugin for building Astro sites with shadcn/ui and Cloudflare Workers.
 
 ## Develop
 
