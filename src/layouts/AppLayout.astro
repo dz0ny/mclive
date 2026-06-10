@@ -36,7 +36,7 @@ function isActive(href: string) {
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="robots" content="noindex" />
     <title>{pageTitle}</title>
     <script is:inline>
@@ -47,13 +47,16 @@ function isActive(href: string) {
           if (t === "dark" || (!t && matchMedia("(prefers-color-scheme: dark)").matches)) {
             document.documentElement.classList.add("dark");
           }
+          const known = ["nord","tokyo","catppuccin","rosepine","gruvbox","dracula","retro82","everforest","osaka","hackerman"];
           const p = localStorage.getItem("mclive.palette");
-          if (p && p !== "nord") document.documentElement.dataset.theme = p;
+          if (p && p !== "nord" && known.includes(p)) document.documentElement.dataset.theme = p;
         } catch {}
       })();
     </script>
   </head>
-  <body class="bg-background text-foreground flex h-screen overflow-hidden">
+  {/* h-dvh (not h-screen/100vh): on iOS Safari 100vh extends behind the bottom
+      URL bar, pushing the mobile toolbar out of reach */}
+  <body class="bg-background text-foreground flex h-dvh overflow-hidden">
     {/* desktop sidebar */}
     <aside class="bg-card hidden w-52 shrink-0 flex-col border-r md:flex">
       <div class="flex items-center gap-2 px-4 py-4">
@@ -96,7 +99,7 @@ function isActive(href: string) {
           <option value="rosepine">Rosé Pine</option>
           <option value="gruvbox">Gruvbox</option>
           <option value="dracula">Dracula</option>
-          <option value="solarized">Solarized</option>
+          <option value="retro82">Retro 82</option>
           <option value="everforest">Everforest</option>
           <option value="osaka">Osaka Jade</option>
           <option value="hackerman">Hackerman</option>
@@ -167,7 +170,7 @@ function isActive(href: string) {
           ["rosepine", "Rosé Pine"],
           ["gruvbox", "Gruvbox"],
           ["dracula", "Dracula"],
-          ["solarized", "Solarized"],
+          ["retro82", "Retro 82"],
           ["everforest", "Everforest"],
           ["osaka", "Osaka Jade"],
           ["hackerman", "Hackerman"],
@@ -176,6 +179,8 @@ function isActive(href: string) {
         try {
           pal = localStorage.getItem("mclive.palette") || "nord";
         } catch {}
+        // stale value from a removed theme (e.g. "solarized") → fall back
+        if (!palettes.some((p) => p[0] === pal)) pal = "nord";
         const apply = (v) => {
           pal = v;
           if (v === "nord") delete document.documentElement.dataset.theme;

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Radio, Map as MapIcon, Megaphone, Hash, Palette, Sun, Moon, Check } from "lucide-react";
+import { Radio, Map as MapIcon, Megaphone, Hash, Palette, Satellite, Sun, Moon, Check } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { href: "/", label: "Packets", Icon: Radio },
   { href: "/map/", label: "Map", Icon: MapIcon },
+  { href: "/observers/", label: "Observers", Icon: Satellite },
   { href: "/adverts/", label: "Adverts", Icon: Megaphone },
   { href: "/channels/", label: "Channels", Icon: Hash },
 ] as const;
@@ -21,6 +22,12 @@ const PALETTES: [string, string][] = [
   ["tokyo", "Tokyo Night"],
   ["catppuccin", "Catppuccin"],
   ["rosepine", "Rosé Pine"],
+  ["gruvbox", "Gruvbox"],
+  ["dracula", "Dracula"],
+  ["retro82", "Retro 82"],
+  ["everforest", "Everforest"],
+  ["osaka", "Osaka Jade"],
+  ["hackerman", "Hackerman"],
 ];
 
 export default function MobileToolbar({ path }: { path: string }) {
@@ -55,10 +62,11 @@ export default function MobileToolbar({ path }: { path: string }) {
     } catch {}
   };
 
-  const tab = "flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium";
+  const tab =
+    "flex flex-1 touch-manipulation flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium";
 
   return (
-    <nav className="bg-card/95 supports-[backdrop-filter]:bg-card/75 z-50 flex shrink-0 border-t backdrop-blur md:hidden">
+    <nav className="bg-card/95 supports-[backdrop-filter]:bg-card/75 z-50 flex shrink-0 border-t pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
       {NAV.map(({ href, label, Icon }) => {
         const active = isActive(href);
         return (

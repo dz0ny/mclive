@@ -463,48 +463,49 @@ All colors MUST be HSL.
     --ring: 265 89% 78%;
   }
 
-  /* Solarized (Light / Dark) — classic blue accent */
-  html[data-theme="solarized"] {
-    --background: 44 87% 94%;
-    --foreground: 192 15% 35%;
-    --card: 44 87% 97%;
-    --card-foreground: 192 15% 35%;
-    --popover: 44 87% 97%;
-    --popover-foreground: 192 15% 35%;
-    --primary: 205 69% 43%;
-    --primary-foreground: 44 87% 97%;
-    --secondary: 44 38% 88%;
-    --secondary-foreground: 192 15% 35%;
-    --muted: 44 38% 90%;
-    --muted-foreground: 194 14% 45%;
-    --accent: 44 38% 88%;
-    --accent-foreground: 192 15% 35%;
-    --destructive: 1 71% 52%;
-    --destructive-foreground: 44 87% 97%;
-    --border: 44 30% 80%;
-    --input: 44 30% 80%;
-    --ring: 205 69% 43%;
+  /* Retro 82 (Day / Night) — 1982 CRT sunset: navy, cream, peach, teal
+     (palette from github.com/OldJobobo/omarchy-retro-82-theme) */
+  html[data-theme="retro82"] {
+    --background: 39 70% 92%;
+    --foreground: 210 100% 12%;
+    --card: 39 75% 95%;
+    --card-foreground: 210 100% 12%;
+    --popover: 39 75% 95%;
+    --popover-foreground: 210 100% 12%;
+    --primary: 186 97% 29%;
+    --primary-foreground: 39 75% 95%;
+    --secondary: 38 52% 85%;
+    --secondary-foreground: 210 100% 12%;
+    --muted: 38 52% 87%;
+    --muted-foreground: 200 30% 30%;
+    --accent: 38 52% 83%;
+    --accent-foreground: 210 100% 12%;
+    --destructive: 14 90% 45%;
+    --destructive-foreground: 39 75% 95%;
+    --border: 38 40% 76%;
+    --input: 38 40% 76%;
+    --ring: 186 97% 29%;
   }
-  html[data-theme="solarized"].dark {
-    --background: 192 100% 11%;
-    --foreground: 186 8% 65%;
-    --card: 192 81% 14%;
-    --card-foreground: 186 8% 65%;
-    --popover: 192 81% 14%;
-    --popover-foreground: 186 8% 65%;
-    --primary: 205 69% 55%;
-    --primary-foreground: 192 100% 11%;
-    --secondary: 192 81% 16%;
-    --secondary-foreground: 186 8% 65%;
-    --muted: 192 81% 16%;
-    --muted-foreground: 194 14% 50%;
-    --accent: 192 50% 21%;
-    --accent-foreground: 186 8% 70%;
-    --destructive: 1 71% 52%;
-    --destructive-foreground: 44 87% 94%;
-    --border: 192 81% 16%;
-    --input: 192 50% 21%;
-    --ring: 205 69% 55%;
+  html[data-theme="retro82"].dark {
+    --background: 210 100% 9%;
+    --foreground: 39 79% 82%;
+    --card: 207 75% 12%;
+    --card-foreground: 39 79% 82%;
+    --popover: 207 75% 12%;
+    --popover-foreground: 39 79% 82%;
+    --primary: 27 94% 70%;
+    --primary-foreground: 210 100% 9%;
+    --secondary: 207 70% 14%;
+    --secondary-foreground: 39 79% 82%;
+    --muted: 207 70% 14%;
+    --muted-foreground: 172 28% 65%;
+    --accent: 190 65% 18%;
+    --accent-foreground: 39 79% 82%;
+    --destructive: 14 96% 56%;
+    --destructive-foreground: 210 100% 9%;
+    --border: 206 65% 16%;
+    --input: 190 65% 18%;
+    --ring: 27 94% 70%;
   }
 
   /* Everforest (Light / Dark) — soft green accent */

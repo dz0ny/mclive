@@ -300,7 +300,7 @@ function ChannelChip({
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-sm",
+        "inline-flex min-h-9 shrink-0 touch-manipulation items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm",
         active ? "bg-primary text-primary-foreground" : "bg-card"
       )}
     >
@@ -309,7 +309,7 @@ function ChannelChip({
       <span className="tabular-nums opacity-70">{count}</span>
       {onRemove && (
         <X
-          className="size-3 opacity-60"
+          className="-m-1.5 box-content size-3.5 p-1.5 opacity-60"
           onClick={(e) => {
             e.stopPropagation();
             onRemove();
