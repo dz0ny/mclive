@@ -7,9 +7,13 @@ preview_urls = true
 # firmware is configured with wss://mclive.dz0ny.workers.dev/mqtt.
 workers_dev = true
 
-# Data retention: wipe rows older than a week, daily at 03:17 UTC.
+# Cron Triggers (worker/index.js `scheduled`):
+#   "47 * * * *" hourly — rebuild the GRP_DATA coverage aggregate (worker/coverage.js).
+#   "17 3 * * *" daily 03:17 UTC — wipe traffic older than a week (adverts and the
+#     node/device directories are kept forever — worker/cleanup.js) and also
+#     rebuild coverage.
 [triggers]
-crons = ["17 3 * * *"]
+crons = ["47 * * * *", "17 3 * * *"]
 
 [observability.logs]
 enabled = false

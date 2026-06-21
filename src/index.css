@@ -110,6 +110,16 @@
   ::file-selector-button {
     border-color: var(--color-gray-200, currentcolor);
   }
+
+  /* Tailwind v4's Preflight resets buttons to `cursor: default`; restore the
+     pointer for interactive controls (but keep the disabled affordance). */
+  button:not(:disabled),
+  [role="button"]:not(:disabled),
+  label[for],
+  summary,
+  a[href] {
+    cursor: pointer;
+  }
 }
 
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 

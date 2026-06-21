@@ -3,7 +3,7 @@ import type { Device, MeshNode, Packet } from "@/lib/meshcore";
 
 export type FeedStatus = "connecting" | "live" | "offline";
 
-const MAX_ROWS = 200;
+const MAX_ROWS = 500;
 
 /**
  * Shared live feed: loads the initial snapshot and subscribes to the SSE stream.
@@ -22,7 +22,7 @@ export function useLiveFeed() {
     (async () => {
       try {
         const [pRes, nRes] = await Promise.all([
-          fetch("/~/api/packets?limit=150").then((r) => r.json()),
+          fetch("/~/api/packets?limit=300").then((r) => r.json()),
           fetch("/~/api/nodes").then((r) => r.json()),
         ]);
         if (cancelled) return;

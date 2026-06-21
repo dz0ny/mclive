@@ -1,7 +1,7 @@
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { Check, Filter, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Check, Filter, X } from "lucide-react";
 
 export function FilterButton({ active }: { active: boolean }) {
   return (
@@ -122,6 +122,23 @@ export function OptionRow({
         {selected && <Check className="size-3" />}
       </span>
       {children}
+    </button>
+  );
+}
+
+export type SortDir = 1 | -1;
+
+/** Column-header sort toggle: off → asc → desc → off. */
+export function SortToggle({ dir, onClick }: { dir: SortDir | null; onClick: () => void }) {
+  const Icon = dir === 1 ? ArrowUp : dir === -1 ? ArrowDown : ArrowUpDown;
+  return (
+    <button type="button" onClick={onClick} className="rounded p-0.5 outline-none" title="Sort">
+      <Icon
+        className={cn(
+          "size-3.5 transition-colors",
+          dir ? "text-primary" : "text-muted-foreground/40 hover:text-foreground"
+        )}
+      />
     </button>
   );
 }

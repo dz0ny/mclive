@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
-import { decodeGroupText, loadAllChannels, type Channel } from "@/lib/channel";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { decodeGroupData, decodeGroupText, loadAllChannels, type Channel } from "@/lib/channel";
 import type { MeshNode, Packet } from "@/lib/meshcore";
 import {
   formatTime,
   matchesSenderQuery,
+  nodeForHash,
   payloadTypeName,
   routeBadgeClass,
   routeLabel,
+  scopeLabel,
   senderName,
   typeBadgeClass,
 } from "@/lib/meshcore";
@@ -21,24 +23,37 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { OptionFilterHead, OptionRow, TextFilterHead, toggleInSet } from "./table-filters";
+import { useUrlNumSet, useUrlString, useUrlStrSet } from "./useUrlState";
 
 interface Props {
   packets: Packet[];
   selectedId: number | null;
+  /** epoch ms scrubbed-to on the timeline; the nearest row is highlighted */
+  scrubTs?: number | null;
   /** known nodes, for resolving the sending node from a packet's path */
   nodes?: MeshNode[];
+  /** fired with the active Sender column query so the parent can pull history */
+  onSenderQuery?: (q: string) => void;
   onSelect: (p: Packet) => void;
 }
 
+const rowKey = (p: Packet) => p.hash ?? `${p.id}`;
+
 function packetNode(p: Packet, nodes: MeshNode[], channels: Channel[]): string | null {
-  // Adverts carry their pubkey; REQ/RESPONSE/TXT/PATH carry a 1-byte src hash;
-  // ANON_REQ a full pubkey — all resolved from the payload, never the path
-  // (path hops are relays, not the originator).
+  // Adverts carry their pubkey; REQ/RESPONSE/TXT/PATH carry a src hash
+  // (pathHashSize bytes); ANON_REQ a full pubkey — all resolved from the
+  // payload, never the path (path hops are relays, not the originator).
   const name = senderName(p, nodes);
   if (name) return name;
   // GRP_TXT hides the sender inside the ciphertext — decryptable on known channels.
   if (p.payload_type === 5 && p.raw && channels.length) {
     return decodeGroupText(p.raw, channels)?.sender ?? null;
+  }
+  // GRP_DATA location beacons carry the sender's pubkey prefix in the (decrypted)
+  // blob — resolve it to a node name, else show the short prefix.
+  if (p.payload_type === 6 && p.raw && channels.length) {
+    const loc = decodeGroupData(p.raw, channels)?.location;
+    if (loc) return nodeForHash(loc.pubkeyPrefix, nodes)?.name || loc.pubkeyPrefix.slice(0, 12);
   }
   return null;
 }
@@ -49,18 +64,26 @@ function pathBytes(p: Packet): number {
   return p.path.length ? p.path[0].length >> 1 : 0;
 }
 
-export default function PacketTable({ packets, selectedId, nodes, onSelect }: Props) {
-  const [sender, setSender] = useState("");
-  const [pathQ, setPathQ] = useState("");
-  const [types, setTypes] = useState<Set<number>>(new Set());
-  const [routes, setRoutes] = useState<Set<string>>(new Set());
-  const [hashSizes, setHashSizes] = useState<Set<number>>(new Set());
+export default function PacketTable({ packets, selectedId, scrubTs, nodes, onSenderQuery, onSelect }: Props) {
+  // filters live in the URL so a filtered view is shareable
+  const [sender, setSender] = useUrlString("sender");
+  const [pathQ, setPathQ] = useUrlString("path");
+  const [types, setTypes] = useUrlNumSet("type");
+  const [routes, setRoutes] = useUrlStrSet("route");
+  const [hashSizes, setHashSizes] = useUrlNumSet("hb");
   const [channels, setChannels] = useState<Channel[]>([]);
 
   // known channels (public + user-added), for decoding GRP_TXT senders
   useEffect(() => {
     loadAllChannels().then(setChannels).catch(() => {});
   }, []);
+
+  // surface the Sender query so the parent can pull matching history from the
+  // server — the live feed only holds a rolling window, so a client-side filter
+  // alone would miss a quiet device's older packets.
+  useEffect(() => {
+    onSenderQuery?.(sender);
+  }, [sender, onSenderQuery]);
 
   // sender label per packet, memoized — decryption/decoding is per-row work
   const senderLabels = useMemo(() => {
@@ -89,6 +112,17 @@ export default function PacketTable({ packets, selectedId, nodes, onSelect }: Pr
     return [...s].sort((a, b) => a - b);
   }, [packets]);
 
+  // pubkeys of nodes whose name matches a (non-hex) Sender query — lets a name
+  // filter match packets the device *relayed*, not just ones it originated, so
+  // it behaves like the map's device (?node=) filter.
+  const senderNodeKeys = useMemo(() => {
+    const sq = sender.trim().toLowerCase();
+    if (!sq) return [] as string[];
+    const isHex = sq.split(/\s+/).every((t) => t.length >= 2 && t.length <= 8 && t.length % 2 === 0 && /^[0-9a-f]+$/.test(t));
+    if (isHex) return [];
+    return (nodes ?? []).filter((n) => (n.name || "").toLowerCase().includes(sq)).map((n) => n.pubkey.toLowerCase());
+  }, [sender, nodes]);
+
   const rows = useMemo(() => {
     const pq = pathQ.trim().toLowerCase();
     const sq = sender.trim().toLowerCase();
@@ -97,11 +131,16 @@ export default function PacketTable({ packets, selectedId, nodes, onSelect }: Pr
       sq.split(/\s+/).every((t) => t.length >= 2 && t.length <= 8 && t.length % 2 === 0 && /^[0-9a-f]+$/.test(t));
     return packets.filter((p) => {
       if (sq) {
-        // hex → match on-wire sender hash / path hops; text → match resolved label
+        // hex → match on-wire sender hash / path hops; text → match the resolved
+        // sender label OR a path hop of a same-named node (sent or relayed)
         if (sqIsHex) {
           if (!matchesSenderQuery(p, sender, nodes ?? [])) return false;
-        } else if (!(senderLabels.get(p) ?? "").toLowerCase().includes(sq)) {
-          return false;
+        } else {
+          const labelHit = (senderLabels.get(p) ?? "").toLowerCase().includes(sq);
+          const pathHit =
+            senderNodeKeys.length > 0 &&
+            p.path.some((h) => senderNodeKeys.some((pk) => pk.startsWith(h.toLowerCase())));
+          if (!labelHit && !pathHit) return false;
         }
       }
       if (pq && !p.path.some((h) => h.toLowerCase().includes(pq))) return false;
@@ -110,7 +149,28 @@ export default function PacketTable({ packets, selectedId, nodes, onSelect }: Pr
       if (routes.size && (!p.route || !routes.has(p.route))) return false;
       return true;
     });
-  }, [packets, nodes, sender, senderLabels, pathQ, hashSizes, types, routes]);
+  }, [packets, nodes, sender, senderLabels, senderNodeKeys, pathQ, hashSizes, types, routes]);
+
+  // the visible row closest in time to the timeline playhead
+  const scrubKey = useMemo(() => {
+    if (scrubTs == null || rows.length === 0) return null;
+    let best: Packet | null = null;
+    let bestDist = Infinity;
+    for (const p of rows) {
+      const d = Math.abs(p.last_seen - scrubTs);
+      if (d < bestDist) {
+        bestDist = d;
+        best = p;
+      }
+    }
+    return best ? rowKey(best) : null;
+  }, [scrubTs, rows]);
+
+  // bring the scrubbed-to row into view as the playhead moves
+  const scrubRowRef = useRef<HTMLTableRowElement>(null);
+  useEffect(() => {
+    if (scrubKey) scrubRowRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [scrubKey]);
 
   return (
     <div className="rounded-lg border">
@@ -181,11 +241,18 @@ export default function PacketTable({ packets, selectedId, nodes, onSelect }: Pr
               </TableCell>
             </TableRow>
           )}
-          {rows.map((p) => (
+          {rows.map((p) => {
+            const isScrub = scrubKey != null && rowKey(p) === scrubKey;
+            return (
             <TableRow
-              key={p.hash ?? `${p.id}`}
+              key={rowKey(p)}
+              ref={isScrub ? scrubRowRef : undefined}
               onClick={() => onSelect(p)}
-              className={cn("cursor-pointer", selectedId === p.id && "bg-muted/60 hover:bg-muted")}
+              className={cn(
+                "cursor-pointer",
+                selectedId === p.id && "bg-muted/60 hover:bg-muted",
+                isScrub && "ring-primary bg-primary/5 ring-2 ring-inset"
+              )}
             >
               <TableCell className="font-mono text-xs tabular-nums">{formatTime(p.last_seen)}</TableCell>
               <TableCell className="text-xs">
@@ -200,11 +267,17 @@ export default function PacketTable({ packets, selectedId, nodes, onSelect }: Pr
                 <Badge variant="outline" className={routeBadgeClass(p.route)}>
                   {routeLabel(p.route)}
                 </Badge>
+                {scopeLabel(p.scope, p.route) && (
+                  <span className="text-muted-foreground ml-1.5 font-mono text-xs">
+                    {scopeLabel(p.scope, p.route)}
+                  </span>
+                )}
               </TableCell>
               <TableCell className="text-right tabular-nums">{p.len ?? "—"}</TableCell>
               <TableCell className="font-mono text-xs">{p.path.length ? p.path.join("→") : "—"}</TableCell>
             </TableRow>
-          ))}
+            );
+          })}
         </TableBody>
       </Table>
     </div>

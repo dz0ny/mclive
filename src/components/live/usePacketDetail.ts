@@ -14,7 +14,12 @@ export function usePacketDetail() {
     setSelectedId(id);
     setDetail(null);
     setLoading(true);
-    if (pushUrl) history.pushState({ p: id }, "", `${location.pathname}?p=${id}`);
+    if (pushUrl) {
+      // keep filter/sort params intact — only the p param changes
+      const url = new URL(location.href);
+      url.searchParams.set("p", String(id));
+      history.pushState({ p: id }, "", url);
+    }
     fetch(`/~/api/packets/${id}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
@@ -27,7 +32,11 @@ export function usePacketDetail() {
   const close = useCallback((pushUrl = true) => {
     setSelectedId(null);
     setDetail(null);
-    if (pushUrl) history.pushState({}, "", location.pathname);
+    if (pushUrl) {
+      const url = new URL(location.href);
+      url.searchParams.delete("p");
+      history.pushState({}, "", url);
+    }
   }, []);
 
   useEffect(() => {

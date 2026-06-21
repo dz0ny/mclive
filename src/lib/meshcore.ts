@@ -21,6 +21,12 @@ export interface Packet {
   best_rssi: number | null;
   /** full wire packet hex (present from the API and SSE; used to decode channels) */
   raw?: string;
+  /**
+   * Region scope for transport-routed packets: region name (e.g. "si"),
+   * "" = transport codes matching no known region (incl. Share), null/absent
+   * otherwise.
+   */
+  scope?: string | null;
 }
 
 export interface Reception {
@@ -42,6 +48,15 @@ export interface DecodedWire {
   version: number;
   pathHashSize: number;
   pathBytes: string[];
+  /**
+   * TRACE (type 9) per-hop SNR measurements in dB — one per link the trace has
+   * traversed so far. traceSnrs[i] is the signal hop i+1 heard from hop i.
+   */
+  traceSnrs?: number[] | null;
+  /** transport codes [scope, reply] for TRANSPORT-routed packets, else null */
+  transportCodes?: [number, number] | null;
+  /** matched region name, "" = unknown region / Share, null = not transport */
+  scope?: string | null;
   payloadOffset: number;
   payloadLen: number;
   payloadHex: string;
@@ -122,16 +137,18 @@ export function advertPubkey(p: Packet): string | null {
   return null;
 }
 
-// Payload types whose payload starts dest_hash(1) + src_hash(1) — the src hash
-// is a 1-byte prefix of the sender's pubkey (see Mesh.cpp / Dispatcher logging).
+// Payload types whose payload starts dest_hash + src_hash — the src hash is a
+// prefix of the sender's pubkey (see Mesh.cpp / Dispatcher logging). Both
+// hashes are pathHashSize bytes wide (1 on old networks, 2+ on newer ones).
 const SRC_HASH_TYPES = new Set([0, 1, 2, 8]); // REQ, RESPONSE, TXT_MSG, PATH
-const PAYLOAD_TYPE_ANON_REQ = 7; // dest_hash(1) + sender pubkey(32) + ...
+const PAYLOAD_TYPE_ANON_REQ = 7; // dest_hash + sender pubkey(32) + ...
 
 /**
  * The sender's on-wire identity hash (hex pubkey prefix), where the protocol
- * carries one. ADVERT → full pubkey; REQ/RESPONSE/TXT_MSG/PATH → 1-byte src
- * hash; ANON_REQ → full pubkey. Returns null for types without a wire sender
- * (ACK, GRP_TXT/GRP_DATA — the group sender hides inside the ciphertext).
+ * carries one. ADVERT → full pubkey; REQ/RESPONSE/TXT_MSG/PATH → src hash
+ * (pathHashSize bytes); ANON_REQ → full pubkey. Returns null for types without
+ * a wire sender (ACK, GRP_TXT/GRP_DATA — the group sender hides inside the
+ * ciphertext).
  *
  * Note the path is NOT used: flood relays append their own hash when
  * re-flooding (Mesh::routeRecvPacket), so path hops are relays, never the
@@ -142,14 +159,16 @@ export function senderHash(p: Packet): string | null {
   if (p.payload_type === PAYLOAD_TYPE_ADVERT) return advertPubkey(p);
   if (SRC_HASH_TYPES.has(p.payload_type)) {
     const { packet } = analyzeRaw(p.raw);
-    if (packet?.payload && packet.payload.length >= 2) {
-      return packet.payload[1].toString(16).padStart(2, "0");
+    const hs = packet?.pathHashSize ?? 1;
+    if (packet?.payload && packet.payload.length >= hs * 2) {
+      return bytesToHex(packet.payload, hs, hs * 2);
     }
   }
   if (p.payload_type === PAYLOAD_TYPE_ANON_REQ) {
     const { packet } = analyzeRaw(p.raw);
-    if (packet?.payload && packet.payload.length >= 33) {
-      return bytesToHex(packet.payload, 1, 33);
+    const hs = packet?.pathHashSize ?? 1;
+    if (packet?.payload && packet.payload.length >= hs + 32) {
+      return bytesToHex(packet.payload, hs, hs + 32);
     }
   }
   return null;
@@ -272,9 +291,20 @@ export function payloadTypeDescription(t: number | null | undefined): string {
 export const ROUTE_DESCRIPTIONS: Record<string, string> = {
   F: "Flood routing: every repeater that hears it rebroadcasts it, and each hop appends its hash to the path.",
   D: "Direct routing: the packet follows a predetermined path of repeaters instead of flooding the whole mesh.",
-  T: "Transport routing: flood/direct delivery scoped with transport codes (regional keys).",
+  T: "Transport routing: flood/direct delivery scoped to a region. The packet carries a 2-byte code (an HMAC of the payload under the region's key) and only repeaters configured for that region recognize it and forward.",
   U: "Unknown routing mode.",
 };
+
+/**
+ * Display label for a packet's region scope: "#si" when detected, "#?" for
+ * transport packets whose code matches no known region, null when the packet
+ * isn't transport-routed (nothing to show).
+ */
+export function scopeLabel(scope: string | null | undefined, route?: string | null): string | null {
+  if (scope) return `#${scope}`;
+  if (scope === "" || route === "T") return "#?";
+  return null;
+}
 
 /** Badge classes per payload type (light + dark variants). */
 export const PAYLOAD_TYPE_BADGE: Record<number, string> = {
@@ -297,6 +327,31 @@ export function typeBadgeClass(t: number | null | undefined): string {
   return (t != null && PAYLOAD_TYPE_BADGE[t]) || "border-border bg-muted text-muted-foreground";
 }
 
+/**
+ * Solid fill color per payload type (tailwind-500 hues, mirroring the badge
+ * palette above). For SVG/canvas where a className isn't usable — e.g. the
+ * timeline histogram. Unknown types fall back to a neutral grey.
+ */
+export const PAYLOAD_TYPE_COLOR: Record<number, string> = {
+  0: "#f59e0b", // amber
+  1: "#84cc16", // lime
+  2: "#3b82f6", // blue
+  3: "#64748b", // slate
+  4: "#10b981", // emerald
+  5: "#8b5cf6", // violet
+  6: "#a855f7", // purple
+  7: "#f97316", // orange
+  8: "#06b6d4", // cyan
+  9: "#ec4899", // pink
+  10: "#78716c", // stone
+  11: "#eab308", // yellow
+  15: "#ef4444", // red
+};
+
+export function payloadTypeColor(t: number | null | undefined): string {
+  return (t != null && PAYLOAD_TYPE_COLOR[t]) || "#94a3b8";
+}
+
 /** Badge classes per route mode. */
 export const ROUTE_BADGE: Record<string, string> = {
   F: "border-orange-300 bg-orange-100 text-orange-800 dark:border-orange-500/40 dark:bg-orange-500/15 dark:text-orange-300",
@@ -306,6 +361,13 @@ export const ROUTE_BADGE: Record<string, string> = {
 
 export function routeBadgeClass(r: string | null | undefined): string {
   return (r && ROUTE_BADGE[r]) || "border-border bg-muted text-muted-foreground";
+}
+
+/** Link-quality text color by SNR (dB): strong / usable / weak. */
+export function snrClass(snr: number): string {
+  if (snr >= 10) return "text-emerald-600 dark:text-emerald-400";
+  if (snr >= 4) return "text-amber-600 dark:text-amber-400";
+  return "text-red-600 dark:text-red-400";
 }
 
 /** Stable-ish color per node hash byte for trace lines / markers. */

@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { useUrlString } from "./useUrlState";
 
 const STATUS_META: Record<ObserverStatus, { label: string; dot: string }> = {
   online: { label: "Online", dot: "bg-emerald-500" },
@@ -31,7 +32,8 @@ function packetHealth(lastPacketAt: number | null, now: number) {
 export default function Observers() {
   const [observers, setObservers] = useState<Observer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [region, setRegion] = useState<string>("all");
+  // region filter lives in the URL so a filtered view is shareable
+  const [region, setRegion] = useUrlString("region", "all");
   const [now, setNow] = useState(() => Date.now());
 
   const load = () =>

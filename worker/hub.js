@@ -10,6 +10,8 @@
  * to D1, and broadcasts normalized events to all SSE clients.
  */
 import { analyzeRaw } from "./lib/decode.js";
+import { detectScope } from "./lib/scope.js";
+import { resolveCountry } from "./lib/geo.js";
 import { iataLatLon } from "./lib/iata.js";
 import {
   MqttDecoder,
@@ -261,6 +263,17 @@ export class PacketHub {
     const now = Date.now();
     const raw = msg.raw || msg.data || "";
     const { packet, advert } = analyzeRaw(raw);
+    // Region scoping: name for transport packets matching a known region,
+    // '' for unmatched/Share, null otherwise (see worker/lib/scope.js).
+    const scope = await detectScope(packet);
+    // Country of a located advert (point-in-polygon, worker/lib/geo.js): ISO2
+    // code, '' for an advert with no European match / no location, null for
+    // non-advert packets.
+    const country = advert
+      ? advert.hasLatLon
+        ? resolveCountry(advert.lat, advert.lon)?.code ?? ""
+        : ""
+      : null;
 
     const route = packet?.route || routeFromJson(msg.route);
     const payloadType =
@@ -291,8 +304,8 @@ export class PacketHub {
       logical = await this.env.DB.prepare(
         `INSERT INTO packets
           (hash, ts, first_seen, last_seen, direction, payload_type, route,
-           len, payload_len, path, raw, reception_count, best_snr, best_rssi, self_advert)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,1,?,?,?)
+           len, payload_len, path, raw, reception_count, best_snr, best_rssi, self_advert, advert_pubkey, scope, country)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,?,?,?)
          ON CONFLICT(hash) DO UPDATE SET
            last_seen=excluded.last_seen,
            reception_count=reception_count+1,
@@ -307,7 +320,8 @@ export class PacketHub {
       )
         .bind(
           hashKey, ts, now, now, direction, payloadType, route,
-          len, payloadLen, pathStr, raw, snr, rssi, isSelfAdvert
+          len, payloadLen, pathStr, raw, snr, rssi, isSelfAdvert,
+          advert ? advert.pubkey.toLowerCase() : null, scope, country
         )
         .first();
     } catch (err) {
@@ -412,6 +426,7 @@ export class PacketHub {
         best_rssi: logical?.best_rssi ?? rssi,
         raw,
         self_advert: isSelfAdvert,
+        scope,
       },
       reception: { origin_id: originId, iata, snr, rssi },
     });

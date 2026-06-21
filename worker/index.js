@@ -8,7 +8,8 @@
 import { Hono } from "hono";
 import { api } from "./api.js";
 import { PacketHub } from "./hub.js";
-import { purgeOldData } from "./cleanup.js";
+import { backfillAdvertPubkeys, backfillScopes, backfillCountries, purgeOldData } from "./cleanup.js";
+import { rebuildCoverage } from "./coverage.js";
 
 export { PacketHub };
 
@@ -40,8 +41,21 @@ export default {
     return app.fetch(request, env, ctx);
   },
 
-  // Cron Trigger: wipe data older than one week (see [triggers].crons).
+  // Cron Triggers (see [triggers].crons in wrangler.toml):
+  //   hourly  → refresh the GRP_DATA coverage aggregate (worker/coverage.js).
+  //   daily   → also wipe traffic older than one week (adverts + directories are
+  //             kept forever — worker/cleanup.js) and drain the advert_pubkey,
+  //             scope and country backfills.
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(purgeOldData(env));
+    const tasks = [rebuildCoverage(env)];
+    if (event.cron === "17 3 * * *") {
+      tasks.push(
+        purgeOldData(env)
+          .then(() => backfillAdvertPubkeys(env))
+          .then(() => backfillScopes(env))
+          .then(() => backfillCountries(env))
+      );
+    }
+    ctx.waitUntil(Promise.all(tasks));
   },
 };

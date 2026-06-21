@@ -76,7 +76,18 @@ export function decodePacket(raw) {
     routeType === ROUTE_TYPE_TRANSPORT_FLOOD || routeType === ROUTE_TYPE_TRANSPORT_DIRECT;
 
   let i = 1;
-  if (hasTransport) i += 4; // skip transport_codes[2] (2 x uint16)
+  let transportCodes = null;
+  if (hasTransport) {
+    // transport_codes[2]: two uint16 LE. codes[0] is the scope (HMAC of the
+    // region key over type+payload, see TransportKey::calcTransportCode);
+    // codes[1] indicates the reply region (mostly unused). {0,0} = "send to
+    // nowhere" (Share adverts).
+    transportCodes = [
+      bytes[1] | (bytes[2] << 8),
+      bytes[3] | (bytes[4] << 8),
+    ];
+    i += 4;
+  }
   if (i >= bytes.length) return { ok: false };
 
   const pathLenByte = bytes[i++];
@@ -129,6 +140,7 @@ export function decodePacket(raw) {
     path,
     pathHashSize: hashSize,
     traceSnrs: isTrace ? traceSnrs : undefined,
+    transportCodes,
     payloadOffset: i,
     payload,
   };
