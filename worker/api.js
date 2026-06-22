@@ -150,9 +150,33 @@ api.get("/packets/:id", async (c) => {
 
 // Decoded adverts (identity announcements), deduped by node public key.
 api.get("/adverts", async (c) => {
-  const rows = await c.env.DB
-    .prepare(`SELECT * FROM packets WHERE payload_type = 4 ORDER BY last_seen DESC LIMIT 400`)
+  // One representative (latest) advert packet per node, across the FULL history
+  // — not just the most recent N packets. Capping the packet window before
+  // deduping by pubkey silently dropped nodes whose latest advert had aged out
+  // of that window, so country/region filters came up short. The advert_pubkey
+  // index makes the per-node MAX(last_seen) lookup cheap.
+  const indexedRows = await c.env.DB
+    .prepare(
+      `SELECT p.* FROM packets p
+         JOIN (
+           SELECT advert_pubkey, MAX(last_seen) AS ms
+             FROM packets
+            WHERE payload_type = 4 AND advert_pubkey IS NOT NULL AND advert_pubkey != ''
+            GROUP BY advert_pubkey
+         ) m ON p.advert_pubkey = m.advert_pubkey AND p.last_seen = m.ms
+        WHERE p.payload_type = 4`
+    )
     .all();
+  // Pre-backfill rows (advert_pubkey NULL) aren't covered by the index above;
+  // include recent ones decoded on the fly until the daily backfill drains them.
+  const legacyRows = await c.env.DB
+    .prepare(
+      `SELECT * FROM packets
+        WHERE payload_type = 4 AND (advert_pubkey IS NULL OR advert_pubkey = '')
+        ORDER BY last_seen DESC LIMIT 400`
+    )
+    .all();
+  const rows = { results: [...(indexedRows.results || []), ...(legacyRows.results || [])] };
   // Per-node advert cadence (count + first/last advert) over the full history,
   // via the advert_pubkey index. Pre-backfill rows (advert_pubkey IS NULL)
   // aren't counted; the daily backfill in worker/cleanup.js drains them.
@@ -244,6 +268,119 @@ api.get("/adverts/:pubkey/history", async (c) => {
     .bind(pubkey)
     .first();
   return c.json({ pubkey, node: node || null, events });
+});
+
+// Repeater directory: nodes that advertise as repeaters (adv_type = 2), joined
+// with the latest ver/telemetry snapshot a probing observer obtained for each.
+// Drives the Repeaters list page. `has_telemetry` lets the list show ✓/—.
+api.get("/repeaters", async (c) => {
+  const rows = await c.env.DB.prepare(
+    `SELECT n.pubkey, n.hash_prefix, n.name, n.adv_type, n.lat, n.lon,
+            n.last_advert_ts, n.updated_at,
+            t.updated_at AS telemetry_at,
+            t.observer_id AS telemetry_observer,
+            t.snr AS telemetry_snr, t.rssi AS telemetry_rssi
+       FROM nodes n
+       LEFT JOIN repeater_telemetry t ON LOWER(t.pubkey) = LOWER(n.pubkey)
+      WHERE n.adv_type = 2
+      ORDER BY n.updated_at DESC`
+  ).all();
+  // Per-node advert cadence (count + first/last advert) over the full history,
+  // via the advert_pubkey index — same stats the /adverts endpoint surfaces, so
+  // the repeater list can show the identical advert-health badge.
+  const statRows = await c.env.DB
+    .prepare(
+      `SELECT advert_pubkey AS pk, COUNT(*) AS n,
+              MIN(first_seen) AS first_advert, MAX(first_seen) AS last_advert
+         FROM packets
+        WHERE payload_type = 4 AND advert_pubkey IS NOT NULL AND advert_pubkey != ''
+        GROUP BY advert_pubkey`
+    )
+    .all();
+  const stats = new Map((statRows.results || []).map((s) => [s.pk, s]));
+  const repeaters = (rows.results || []).map((r) => {
+    // Resolve country from the node's self-reported location (same point-in-
+    // polygon the adverts API uses) so the Location column can filter by country.
+    const country =
+      r.lat != null && r.lon != null && !(r.lat === 0 && r.lon === 0)
+        ? resolveCountry(r.lat, r.lon)?.code ?? null
+        : null;
+    const s = stats.get((r.pubkey || "").toLowerCase());
+    return {
+      ...r,
+      country,
+      has_telemetry: r.telemetry_at != null,
+      advert_count: s?.n ?? 1,
+      first_advert: s?.first_advert ?? r.last_advert_ts ?? r.updated_at,
+      last_advert: s?.last_advert ?? r.last_advert_ts ?? r.updated_at,
+    };
+  });
+  return c.json({ repeaters });
+});
+
+// One repeater: node record + latest decoded telemetry snapshot + latest TRACE
+// that targeted it (decoded for the per-hop SNR traceroute). Both telemetry and
+// trace are nullable — a repeater with no successful probe yet shows neither.
+api.get("/repeaters/:pk", async (c) => {
+  const pk = (c.req.param("pk") || "").toLowerCase().replace(/[^0-9a-f]/g, "");
+  if (pk.length !== 64) return c.json({ error: "bad pubkey" }, 400);
+  const db = c.env.DB;
+
+  const node = await db.prepare(`SELECT * FROM nodes WHERE LOWER(pubkey) = ?`).bind(pk).first();
+
+  const tRow = await db
+    .prepare(`SELECT * FROM repeater_telemetry WHERE LOWER(pubkey) = ?`)
+    .bind(pk)
+    .first();
+  let telemetry = null;
+  if (tRow) {
+    let fields = null;
+    try {
+      fields = JSON.parse(tRow.telemetry);
+    } catch {}
+    telemetry = {
+      fields,
+      observer_id: tRow.observer_id,
+      snr: tRow.snr,
+      rssi: tRow.rssi,
+      updated_at: tRow.updated_at,
+    };
+  }
+
+  // Latest probe TRACE for this repeater (firmware stamped target_pubkey).
+  const traceRow = await db
+    .prepare(
+      `SELECT * FROM packets WHERE payload_type = 9 AND target_pubkey = ? ORDER BY last_seen DESC LIMIT 1`
+    )
+    .bind(pk)
+    .first();
+  let trace = null;
+  if (traceRow) {
+    const { packet } = analyzeRaw(traceRow.raw || "");
+    const pathArr = packet?.path?.length
+      ? packet.path
+      : traceRow.path
+        ? String(traceRow.path).split(",").filter(Boolean)
+        : [];
+    const hops = [];
+    for (const h of pathArr) {
+      const hopNode = h
+        ? await db.prepare(`SELECT * FROM nodes WHERE pubkey LIKE ? LIMIT 1`).bind(`${h.toLowerCase()}%`).first()
+        : null;
+      hops.push({ hash: h, node: hopNode || null });
+    }
+    trace = {
+      id: traceRow.id,
+      hash: traceRow.hash,
+      last_seen: traceRow.last_seen,
+      best_snr: traceRow.best_snr,
+      best_rssi: traceRow.best_rssi,
+      hops,
+      traceSnrs: packet?.traceSnrs ?? null,
+    };
+  }
+
+  return c.json({ pubkey: pk, node: node || null, telemetry, trace });
 });
 
 api.get("/nodes", async (c) => {

@@ -8,6 +8,9 @@
  *     recency, name/location changes over time.
  *   - nodes and devices — identity directories; deleting a stale row would
  *     erase what we know about a node/observer, not just old traffic.
+ *   - repeater_telemetry — latest ver/telemetry snapshot per repeater; a
+ *     separate table the purge never touches, so the most recent probe result
+ *     survives even though the underlying TRACE/RESPONSE packets age out.
  */
 import { analyzeRaw } from "./lib/decode.js";
 import { detectScope } from "./lib/scope.js";

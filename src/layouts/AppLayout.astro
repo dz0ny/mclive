@@ -19,12 +19,18 @@ const ICONS = {
   hash: ['<line x1="4" x2="20" y1="9" y2="9"/>', '<line x1="4" x2="20" y1="15" y2="15"/>', '<line x1="10" x2="8" y1="3" y2="21"/>', '<line x1="16" x2="14" y1="3" y2="21"/>'].join(""),
   megaphone: ['<path d="m3 11 18-5v12L3 14v-3z"/>', '<path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>'].join(""),
   satellite: ['<path d="M13 7 9 3 5 7l4 4"/>', '<path d="m17 11 4 4-4 4-4-4"/>', '<path d="m8 12 4 4"/>', '<path d="m16 8 3-3"/>', '<path d="M9 21a6 6 0 0 0-6-6"/>'].join(""),
+  router: ['<rect width="20" height="8" x="2" y="14" rx="2"/>', '<path d="M6.01 18H6"/>', '<path d="M10.01 18H10"/>', '<path d="M15 10v4"/>', '<path d="M17.84 7.17a4 4 0 0 0-5.66 0"/>', '<path d="M20.66 4.34a8 8 0 0 0-11.31 0"/>'].join(""),
 };
 const nav = [
-  { href: "/", label: "Packets", icon: ICONS.radio },
+  {
+    href: "/",
+    label: "Packets",
+    icon: ICONS.radio,
+    children: [{ href: "/adverts", label: "Adverts", icon: ICONS.megaphone }],
+  },
   { href: "/map", label: "Map", icon: ICONS.map },
   { href: "/observers", label: "Observers", icon: ICONS.satellite },
-  { href: "/adverts", label: "Adverts", icon: ICONS.megaphone },
+  { href: "/repeaters", label: "Repeaters", icon: ICONS.router },
   { href: "/channels", label: "Channels", icon: ICONS.hash },
 ];
 function isActive(href: string) {
@@ -65,23 +71,43 @@ function isActive(href: string) {
       </div>
       <nav class="flex flex-col gap-1 px-2">
         {
-          nav.map(({ href, label, icon }) => (
-            <a
-              href={href}
-              class:list={[
-                "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors",
-                isActive(href)
-                  ? "bg-primary/10 text-primary font-medium"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              ]}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                stroke-linejoin="round" class="size-4 shrink-0" set:html={icon}
-              />
-              {label}
-            </a>
+          nav.map(({ href, label, icon, children }) => (
+            <>
+              <a
+                href={href}
+                class:list={[
+                  "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors",
+                  isActive(href)
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                ]}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                  stroke-linejoin="round" class="size-4 shrink-0" set:html={icon}
+                />
+                {label}
+              </a>
+              {children?.map((child) => (
+                <a
+                  href={child.href}
+                  class:list={[
+                    "ml-3 flex items-center gap-2.5 rounded-md border-l border-border/60 px-3 py-2 text-sm transition-colors",
+                    isActive(child.href)
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  ]}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round" class="size-4 shrink-0" set:html={child.icon}
+                  />
+                  {child.label}
+                </a>
+              ))}
+            </>
           ))
         }
       </nav>

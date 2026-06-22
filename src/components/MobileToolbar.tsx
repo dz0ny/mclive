@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Radio, Map as MapIcon, Megaphone, Hash, Palette, Satellite, Sun, Moon, Check } from "lucide-react";
+import { Radio, Map as MapIcon, Megaphone, Hash, Palette, Satellite, Router, Sun, Moon, Check } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -14,6 +14,7 @@ const NAV = [
   { href: "/map/", label: "Map", Icon: MapIcon },
   { href: "/observers/", label: "Observers", Icon: Satellite },
   { href: "/adverts/", label: "Adverts", Icon: Megaphone },
+  { href: "/repeaters/", label: "Repeaters", Icon: Router },
   { href: "/channels/", label: "Channels", Icon: Hash },
 ] as const;
 

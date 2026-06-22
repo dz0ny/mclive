@@ -289,6 +289,20 @@ export class PacketHub {
     const origin = msg.origin || null;
     const iata = msg.iata || null;
 
+    // Firmware-initiated repeater probe attribution (see migration 0008). The
+    // mc-mq that auto-probed a repeater after its advert stamps the repeater's
+    // pubkey on the uplink — and, for a decrypted RESPONSE (0x01, telemetry is
+    // encrypted to the requester so the worker can't read raw), the decoded
+    // telemetry fields. Both are optional and absent on ordinary observed traffic.
+    const targetPubkey =
+      typeof msg.target_pubkey === "string" && /^[0-9a-fA-F]{64}$/.test(msg.target_pubkey)
+        ? msg.target_pubkey.toLowerCase()
+        : null;
+    const telemetry =
+      msg.telemetry && typeof msg.telemetry === "object" && !Array.isArray(msg.telemetry)
+        ? msg.telemetry
+        : null;
+
     // Dedup key: the MeshCore packet hash. The same packet heard by multiple
     // observers collapses to one row; fall back to the raw bytes if no hash.
     const hashKey = msg.hash || (raw ? `raw:${raw.slice(0, 48)}` : `t:${now}`);
@@ -304,8 +318,8 @@ export class PacketHub {
       logical = await this.env.DB.prepare(
         `INSERT INTO packets
           (hash, ts, first_seen, last_seen, direction, payload_type, route,
-           len, payload_len, path, raw, reception_count, best_snr, best_rssi, self_advert, advert_pubkey, scope, country)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,?,?,?)
+           len, payload_len, path, raw, reception_count, best_snr, best_rssi, self_advert, advert_pubkey, scope, country, target_pubkey)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,?,?,?,?)
          ON CONFLICT(hash) DO UPDATE SET
            last_seen=excluded.last_seen,
            reception_count=reception_count+1,
@@ -315,13 +329,14 @@ export class PacketHub {
                           THEN excluded.best_rssi ELSE best_rssi END,
            path=excluded.path,
            len=excluded.len,
-           payload_len=excluded.payload_len
+           payload_len=excluded.payload_len,
+           target_pubkey=COALESCE(excluded.target_pubkey, target_pubkey)
          RETURNING id, first_seen, reception_count, best_snr, best_rssi`
       )
         .bind(
           hashKey, ts, now, now, direction, payloadType, route,
           len, payloadLen, pathStr, raw, snr, rssi, isSelfAdvert,
-          advert ? advert.pubkey.toLowerCase() : null, scope, country
+          advert ? advert.pubkey.toLowerCase() : null, scope, country, targetPubkey
         )
         .first();
     } catch (err) {
@@ -405,6 +420,37 @@ export class PacketHub {
       }
     }
 
+    // Decoded repeater telemetry (firmware-decrypted RESPONSE) → latest-snapshot
+    // table, keyed by the repeater this probe targeted. Broadcast so an open
+    // repeater page updates live.
+    if (telemetry && targetPubkey) {
+      try {
+        await this.env.DB.prepare(
+          `INSERT INTO repeater_telemetry (pubkey, telemetry, observer_id, snr, rssi, updated_at)
+           VALUES (?,?,?,?,?,?)
+           ON CONFLICT(pubkey) DO UPDATE SET
+             telemetry=excluded.telemetry,
+             observer_id=excluded.observer_id,
+             snr=excluded.snr,
+             rssi=excluded.rssi,
+             updated_at=excluded.updated_at`
+        )
+          .bind(targetPubkey, JSON.stringify(telemetry), originId, snr, rssi, now)
+          .run();
+        this.broadcast({
+          type: "telemetry",
+          pubkey: targetPubkey,
+          telemetry,
+          observer_id: originId,
+          snr,
+          rssi,
+          updated_at: now,
+        });
+      } catch (err) {
+        console.error("repeater telemetry upsert failed:", err);
+      }
+    }
+
     // Fan out to SSE clients. `packet` is the deduped logical record; `path` is
     // this reception's hops (used for the live map animation).
     this.broadcast({
@@ -427,6 +473,7 @@ export class PacketHub {
         raw,
         self_advert: isSelfAdvert,
         scope,
+        target_pubkey: targetPubkey,
       },
       reception: { origin_id: originId, iata, snr, rssi },
     });
