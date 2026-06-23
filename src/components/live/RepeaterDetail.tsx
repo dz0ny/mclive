@@ -1,15 +1,33 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import {
   ADV_TYPE_NAMES,
   formatAgo,
   formatDateTime,
+  formatTime,
   formatUptime,
+  type AdvertInfo,
   type Hop,
   type MeshNode,
+  type Packet,
+  payloadTypeName,
+  routeBadgeClass,
+  routeLabel,
   snrClass,
+  typeBadgeClass,
 } from "@/lib/meshcore";
 import { cn } from "@/lib/utils";
+import DetailMap from "./DetailMap";
+import PacketDetailSheet from "./PacketDetail";
+import { usePacketDetail } from "./usePacketDetail";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 /** Latest decoded ver/telemetry snapshot for a repeater (from /~/api/repeaters/:pk). */
 interface RepeaterTelemetry {
@@ -48,6 +66,23 @@ interface Props {
 export default function RepeaterDetail({ pubkey, fallbackName, onBack }: Props) {
   const [data, setData] = useState<RepeaterData | null>(null);
   const [loading, setLoading] = useState(true);
+  // packets sent (or relayed) by this node — ?sender= matches the pubkey on path
+  const [sent, setSent] = useState<Packet[]>([]);
+  const { selectedId, detail, loading: pktLoading, open, close } = usePacketDetail();
+
+  const loadSent = useCallback(() => {
+    fetch(`/~/api/packets?sender=${encodeURIComponent(pubkey)}&limit=100`)
+      .then((r) => r.json())
+      .then((d) => setSent(d.packets ?? []))
+      .catch(() => {});
+  }, [pubkey]);
+
+  useEffect(() => {
+    setSent([]);
+    loadSent();
+    const t = setInterval(loadSent, 10000);
+    return () => clearInterval(t);
+  }, [loadSent]);
 
   // (re)load the full record — also fired when a fresh probe arrives over SSE
   useEffect(() => {
@@ -115,6 +150,24 @@ export default function RepeaterDetail({ pubkey, fallbackName, onBack }: Props) 
       ? { lat: node.lat, lon: node.lon }
       : null;
 
+  // feed the shared detail map a single self-reported marker for this repeater
+  const mapAdvert = useMemo<AdvertInfo | null>(
+    () =>
+      located
+        ? {
+            pubkey,
+            hashPrefix: node?.hash_prefix ?? pubkey.slice(0, 2),
+            advType: node?.adv_type ?? 2,
+            hasLatLon: true,
+            lat: located.lat,
+            lon: located.lon,
+            name,
+            advTimestamp: node?.last_advert_ts ?? node?.updated_at ?? 0,
+          }
+        : null,
+    [located, pubkey, node, name]
+  );
+
   return (
     <div className="space-y-6">
       <div>
@@ -159,8 +212,20 @@ export default function RepeaterDetail({ pubkey, fallbackName, onBack }: Props) 
             />
           </div>
 
+          {mapAdvert && (
+            <section className="rounded-lg border">
+              <header className="border-b px-4 py-3">
+                <h2 className="text-sm font-semibold uppercase tracking-wide">Location</h2>
+              </header>
+              <div className="p-3">
+                <DetailMap advert={mapAdvert} hops={[]} />
+              </div>
+            </section>
+          )}
+
           <TelemetryCard telemetry={data.telemetry} now={now} />
           <TraceCard trace={data.trace} now={now} />
+          <SentPacketsCard packets={sent} onSelect={(p) => p.id != null && open(p.id)} />
 
           <p className="text-muted-foreground text-xs">
             Telemetry and traces are gathered passively: an observer auto-probes a repeater after
@@ -168,7 +233,90 @@ export default function RepeaterDetail({ pubkey, fallbackName, onBack }: Props) 
           </p>
         </>
       )}
+
+      <PacketDetailSheet
+        open={selectedId != null}
+        loading={pktLoading}
+        detail={detail}
+        onOpenChange={(o) => {
+          if (!o) close();
+        }}
+      />
     </div>
+  );
+}
+
+// --- packets sent / relayed by this node -----------------------------------
+
+function SentPacketsCard({
+  packets,
+  onSelect,
+}: {
+  packets: Packet[];
+  onSelect: (p: Packet) => void;
+}) {
+  return (
+    <section className="rounded-lg border">
+      <header className="flex flex-wrap items-baseline justify-between gap-2 border-b px-4 py-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wide">Packets</h2>
+        <span className="text-muted-foreground text-xs">
+          {packets.length > 0 ? `${packets.length} most recent on this node's path` : ""}
+        </span>
+      </header>
+      {packets.length === 0 ? (
+        <p className="text-muted-foreground px-4 py-6 text-center text-xs">
+          No packets seen from this node yet. This lists packets it originated or relayed (matched by
+          its pubkey on the path).
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <Table className="min-w-[560px]">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Time</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Route</TableHead>
+                <TableHead className="text-right">Hops</TableHead>
+                <TableHead className="text-right">SNR</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {packets.map((p) => (
+                <TableRow
+                  key={p.hash ?? p.id}
+                  onClick={() => onSelect(p)}
+                  className="cursor-pointer"
+                >
+                  <TableCell className="text-xs tabular-nums whitespace-nowrap">
+                    {formatTime(p.last_seen)}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className={typeBadgeClass(p.payload_type)}>
+                      {payloadTypeName(p.payload_type)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className={routeBadgeClass(p.route)}>
+                      {routeLabel(p.route)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">{p.path.length}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {p.best_snr != null ? (
+                      <span className={cn("font-mono", snrClass(p.best_snr))}>
+                        {p.best_snr.toFixed(1)}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </section>
   );
 }
 
