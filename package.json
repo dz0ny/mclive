@@ -14,6 +14,7 @@
     "dev:worker": "wrangler dev",
     "db:migrate": "wrangler d1 migrations apply mclive --local",
     "db:migrate:remote": "wrangler d1 migrations apply mclive --remote",
+    "deploy": "wrangler d1 migrations apply mclive --remote && wrangler deploy",
     "bridge:replay": "node bridge/replay.mjs"
   },
   "dependencies": {
