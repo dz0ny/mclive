@@ -379,16 +379,28 @@ export function hashColor(hashByte: string): string {
 }
 
 /**
- * Resolve a path hash to a node. Path hashes are 1–4 bytes (the leading bytes
- * of the sender's pubkey), so match by pubkey prefix rather than a fixed byte.
+ * Resolve a pubkey prefix (path hop hash, src hash, beacon prefix) to a node.
+ * Hashes are 1–4 bytes (the leading bytes of the pubkey), so match by pubkey
+ * prefix rather than a fixed byte. Short prefixes collide; among matches prefer
+ * a repeater when resolving a path hop ({ hop: true } — only repeaters relay),
+ * then the most recently heard node.
  */
-export function nodeForHash(hash: string, nodes: MeshNode[]): MeshNode | null {
+export function nodeForHash(hash: string, nodes: MeshNode[], opts: { hop?: boolean } = {}): MeshNode | null {
   if (!hash) return null;
   const h = hash.toLowerCase();
+  const rank = (n: MeshNode) => (opts.hop && n.adv_type === ADV_TYPE_REPEATER ? 1 : 0);
+  let best: MeshNode | null = null;
   for (const n of nodes) {
-    if (n.pubkey.toLowerCase().startsWith(h)) return n;
+    if (!n.pubkey.toLowerCase().startsWith(h)) continue;
+    if (
+      !best ||
+      rank(n) > rank(best) ||
+      (rank(n) === rank(best) && (n.updated_at ?? 0) > (best.updated_at ?? 0))
+    ) {
+      best = n;
+    }
   }
-  return null;
+  return best;
 }
 
 /**
@@ -428,6 +440,8 @@ export function formatTime(epochMs: number): string {
 export function formatDateTime(epochMs: number): string {
   return new Date(epochMs).toLocaleString(undefined, { hour12: false });
 }
+
+export const ADV_TYPE_REPEATER = 2;
 
 export const ADV_TYPE_NAMES: Record<number, string> = {
   0: "none",

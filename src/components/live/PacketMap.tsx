@@ -602,7 +602,7 @@ export default function PacketMap({
 
     const coords: number[][] = [];
     for (const h of latest.path) {
-      const node = nodeForHash(h, nodesRef.current);
+      const node = nodeForHash(h, nodesRef.current, { hop: true });
       if (node) coords.push(fromLonLat([node.lon, node.lat]));
     }
     if (coords.length < 1) return;
@@ -652,7 +652,7 @@ export default function PacketMap({
 
     const coords: number[][] = [];
     for (const h of pinnedPath) {
-      const node = nodeForHash(h, nodesRef.current);
+      const node = nodeForHash(h, nodesRef.current, { hop: true });
       if (node) coords.push(fromLonLat([node.lon, node.lat]));
     }
     if (coords.length === 0) return;

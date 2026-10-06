@@ -461,7 +461,7 @@ export default function LiveMap() {
     for (const p of allPackets) {
       if (p.last_seen < cutoff || p.path.length < 2) continue;
       const hops = p.path
-        .map((h) => nodeForHash(h, nodes))
+        .map((h) => nodeForHash(h, nodes, { hop: true }))
         .filter((n): n is MeshNode => !!n && !(n.lat === 0 && n.lon === 0));
       if (hops.length < 2) continue; // not enough to draw a path
       if (!hops.some((n) => inExtent(n, extent))) continue;

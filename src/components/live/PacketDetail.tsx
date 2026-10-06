@@ -94,7 +94,7 @@ export default function PacketDetail({ open, loading, detail, onOpenChange }: Pr
     if (selectedRec == null) return detail.hops;
     const rec = detail.receptions[selectedRec];
     if (!rec) return detail.hops;
-    return rec.path.map((hash) => ({ hash, node: nodeForHash(hash, nodeDir) }));
+    return rec.path.map((hash) => ({ hash, node: nodeForHash(hash, nodeDir, { hop: true }) }));
   }, [detail, selectedRec, nodeDir]);
 
   // TRACE (type 9): the path IS the traceroute, and decoded.traceSnrs carries
