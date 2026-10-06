@@ -9,6 +9,8 @@
  * Removed after two weeks without an advert (hourly): repeaters (nodes with
  *   adv_type 2) and their repeater_telemetry snapshot — see
  *   purgeStaleRepeaters. The next advert re-creates the node.
+ * Removed hourly: nodes with no packets at all (no advert and no probe that
+ *   targets them) — see purgeOrphanNodes.
  * Kept forever:
  *   - ADVERT packets (payload_type 4) — the per-node history: advert cadence,
  *     recency, name/location changes over time.
@@ -79,6 +81,35 @@ export async function purgeStaleRepeaters(env, now = Date.now()) {
   if (deleted.repeaters || deleted.telemetry) {
     console.log(`stale repeater purge (cutoff ${new Date(cutoff).toISOString()}):`, JSON.stringify(deleted));
   }
+  return deleted;
+}
+
+/**
+ * Drop nodes that no packet refers to: no ADVERT from the node
+ * (advert_pubkey) and no probe that targets it (target_pubkey). Also drop the
+ * repeater_telemetry rows of those nodes. We skip the run while the
+ * advert_pubkey backfill has rows to do, because a NULL advert_pubkey can hide
+ * the advert of a node.
+ */
+export async function purgeOrphanNodes(env) {
+  const db = env.DB;
+  const pending = await db
+    .prepare(`SELECT 1 FROM packets WHERE payload_type = 4 AND advert_pubkey IS NULL LIMIT 1`)
+    .first();
+  if (pending) return { skipped: "advert_pubkey backfill pending" };
+  const orphan = `NOT EXISTS (SELECT 1 FROM packets p WHERE p.advert_pubkey = LOWER(nodes.pubkey))
+     AND NOT EXISTS (SELECT 1 FROM packets p WHERE p.target_pubkey = LOWER(nodes.pubkey))`;
+  const res = await db.batch([
+    db.prepare(
+      `DELETE FROM repeater_telemetry WHERE LOWER(pubkey) IN (SELECT LOWER(pubkey) FROM nodes WHERE ${orphan})`
+    ),
+    db.prepare(`DELETE FROM nodes WHERE ${orphan}`),
+  ]);
+  const deleted = {
+    telemetry: res[0]?.meta?.changes ?? 0,
+    nodes: res[1]?.meta?.changes ?? 0,
+  };
+  if (deleted.nodes || deleted.telemetry) console.log(`orphan node purge:`, JSON.stringify(deleted));
   return deleted;
 }
 

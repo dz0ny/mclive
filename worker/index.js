@@ -8,7 +8,7 @@
 import { Hono } from "hono";
 import { api } from "./api.js";
 import { PacketHub } from "./hub.js";
-import { backfillAdvertPubkeys, backfillScopes, backfillCountries, purgeOldData, purgeStaleObservers, purgeStaleRepeaters } from "./cleanup.js";
+import { backfillAdvertPubkeys, backfillScopes, backfillCountries, purgeOldData, purgeStaleObservers, purgeStaleRepeaters, purgeOrphanNodes } from "./cleanup.js";
 import { rebuildCoverage } from "./coverage.js";
 
 export { PacketHub };
@@ -43,13 +43,14 @@ export default {
 
   // Cron Triggers (see [triggers].crons in wrangler.toml):
   //   hourly  → refresh the GRP_DATA coverage aggregate (worker/coverage.js)
-  //             and remove observers silent for over a week and repeaters
-  //             without an advert for two weeks (worker/cleanup.js).
+  //             and remove observers silent for over a week, repeaters
+  //             without an advert for two weeks and nodes with no packets
+  //             (worker/cleanup.js).
   //   daily   → also wipe traffic older than one week (adverts + directories are
   //             kept forever — worker/cleanup.js) and drain the advert_pubkey,
   //             scope and country backfills.
   async scheduled(event, env, ctx) {
-    const tasks = [rebuildCoverage(env), purgeStaleObservers(env), purgeStaleRepeaters(env)];
+    const tasks = [rebuildCoverage(env), purgeStaleObservers(env), purgeStaleRepeaters(env).then(() => purgeOrphanNodes(env))];
     if (event.cron === "17 3 * * *") {
       tasks.push(
         purgeOldData(env)

@@ -9,8 +9,8 @@ workers_dev = true
 
 # Cron Triggers (worker/index.js `scheduled`):
 #   "47 * * * *" hourly — rebuild the GRP_DATA coverage aggregate (worker/coverage.js)
-#     and remove observers that haven't reported for over a week and repeaters
-#     without an advert for two weeks (worker/cleanup.js).
+#     and remove observers that haven't reported for over a week, repeaters
+#     without an advert for two weeks and nodes with no packets (worker/cleanup.js).
 #   "17 3 * * *" daily 03:17 UTC — wipe traffic older than a week (adverts and the
 #     other nodes are kept forever — worker/cleanup.js) and also
 #     rebuild coverage.
