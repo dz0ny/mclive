@@ -138,15 +138,17 @@ export function advertPubkey(p: Packet): string | null {
 }
 
 // Payload types whose payload starts dest_hash + src_hash — the src hash is a
-// prefix of the sender's pubkey (see Mesh.cpp / Dispatcher logging). Both
-// hashes are pathHashSize bytes wide (1 on old networks, 2+ on newer ones).
+// prefix of the sender's pubkey (see Mesh.cpp / Dispatcher logging). Payload
+// hashes are always PAYLOAD_HASH_SIZE (1) byte wide (MeshCore.h PATH_HASH_SIZE),
+// independent of the path hash mode, which only widens the hops in `path`.
 const SRC_HASH_TYPES = new Set([0, 1, 2, 8]); // REQ, RESPONSE, TXT_MSG, PATH
 const PAYLOAD_TYPE_ANON_REQ = 7; // dest_hash + sender pubkey(32) + ...
+const PAYLOAD_HASH_SIZE = 1;
 
 /**
  * The sender's on-wire identity hash (hex pubkey prefix), where the protocol
- * carries one. ADVERT → full pubkey; REQ/RESPONSE/TXT_MSG/PATH → src hash
- * (pathHashSize bytes); ANON_REQ → full pubkey. Returns null for types without
+ * carries one. ADVERT → full pubkey; REQ/RESPONSE/TXT_MSG/PATH → 1-byte src
+ * hash; ANON_REQ → full pubkey. Returns null for types without
  * a wire sender (ACK, GRP_TXT/GRP_DATA — the group sender hides inside the
  * ciphertext).
  *
@@ -157,16 +159,15 @@ const PAYLOAD_TYPE_ANON_REQ = 7; // dest_hash + sender pubkey(32) + ...
 export function senderHash(p: Packet): string | null {
   if (!p.raw || p.payload_type == null) return null;
   if (p.payload_type === PAYLOAD_TYPE_ADVERT) return advertPubkey(p);
+  const hs = PAYLOAD_HASH_SIZE;
   if (SRC_HASH_TYPES.has(p.payload_type)) {
     const { packet } = analyzeRaw(p.raw);
-    const hs = packet?.pathHashSize ?? 1;
     if (packet?.payload && packet.payload.length >= hs * 2) {
       return bytesToHex(packet.payload, hs, hs * 2);
     }
   }
   if (p.payload_type === PAYLOAD_TYPE_ANON_REQ) {
     const { packet } = analyzeRaw(p.raw);
-    const hs = packet?.pathHashSize ?? 1;
     if (packet?.payload && packet.payload.length >= hs + 32) {
       return bytesToHex(packet.payload, hs, hs + 32);
     }

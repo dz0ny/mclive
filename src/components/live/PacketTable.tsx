@@ -40,8 +40,8 @@ interface Props {
 const rowKey = (p: Packet) => p.hash ?? `${p.id}`;
 
 function packetNode(p: Packet, nodes: MeshNode[], channels: Channel[]): string | null {
-  // Adverts carry their pubkey; REQ/RESPONSE/TXT/PATH carry a src hash
-  // (pathHashSize bytes); ANON_REQ a full pubkey — all resolved from the
+  // Adverts carry their pubkey; REQ/RESPONSE/TXT/PATH carry a 1-byte src
+  // hash; ANON_REQ a full pubkey — all resolved from the
   // payload, never the path (path hops are relays, not the originator).
   const name = senderName(p, nodes);
   if (name) return name;
