@@ -23,6 +23,7 @@
 
 export const PAYLOAD_TYPE_ADVERT = 0x04;
 export const PAYLOAD_TYPE_TRACE = 0x09;
+export const PAYLOAD_TYPE_CONTROL = 0x0b;
 
 const ROUTE_LABELS = { 0: "T", 1: "F", 2: "D", 3: "T" }; // flood/direct + transport
 const ROUTE_TYPE_TRANSPORT_FLOOD = 0x00;
@@ -94,6 +95,14 @@ export function decodePacket(raw) {
   let hashSize = (pathLenByte >> 6) + 1;
   let hashCount = pathLenByte & 0x3f;
   let pathByteLen = hashCount * hashSize;
+  // Hash size code 3 (top bits 11) is reserved. The firmware drops these
+  // packets, so we flag them and do not read the path.
+  let malformed = null;
+  if (hashSize === 4 && payloadType !== PAYLOAD_TYPE_TRACE) {
+    malformed = "reserved path hash size";
+    hashCount = 0;
+    pathByteLen = 0;
+  }
 
   // TRACE packets (type 9) are special (see Mesh.cpp): the wire path holds one
   // SNR byte per traversed hop (int8, dB*4) — NOT node hashes — and path_len is
@@ -141,9 +150,50 @@ export function decodePacket(raw) {
     pathHashSize: hashSize,
     traceSnrs: isTrace ? traceSnrs : undefined,
     transportCodes,
+    malformed,
     payloadOffset: i,
     payload,
   };
+}
+
+const CTL_TYPE_NODE_DISCOVER_REQ = 0x80;
+const CTL_TYPE_NODE_DISCOVER_RESP = 0x90;
+
+/**
+ * Decode a CONTROL (0x0B) payload. The upper 4 bits of byte 0 give the sub
+ * type. See MeshCore docs/payloads.md "Control data".
+ * DISCOVER_REQ: flags(1) type_filter(1) tag(4) [since(4)].
+ * DISCOVER_RESP: flags(1, low 4 bits = node type) snr(1, SNR*4) tag(4) pubkey(8 or 32).
+ */
+export function decodeControl(payload) {
+  if (!payload || payload.length < 1) return null;
+  const flags = payload[0];
+  const subType = flags & 0xf0;
+  const u32 = (off) => (payload[off] | (payload[off + 1] << 8) | (payload[off + 2] << 16) | (payload[off + 3] << 24)) >>> 0;
+  if (subType === CTL_TYPE_NODE_DISCOVER_REQ && payload.length >= 6) {
+    const filter = payload[1];
+    const types = [];
+    for (let t = 1; t <= 4; t++) if (filter & (1 << t)) types.push(t);
+    return {
+      kind: "DISCOVER_REQ",
+      subType,
+      prefixOnly: (flags & 1) === 1,
+      typeFilter: types,
+      tag: u32(2),
+      since: payload.length >= 10 ? u32(6) : 0,
+    };
+  }
+  if (subType === CTL_TYPE_NODE_DISCOVER_RESP && payload.length >= 6 + 8) {
+    return {
+      kind: "DISCOVER_RESP",
+      subType,
+      nodeType: flags & 0x0f,
+      snr: ((payload[1] << 24) >> 24) / 4,
+      tag: u32(2),
+      pubkey: bytesToHex(payload, 6, Math.min(payload.length, 6 + PUB_KEY_SIZE)),
+    };
+  }
+  return { kind: "UNKNOWN", subType };
 }
 
 /**

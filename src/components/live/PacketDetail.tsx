@@ -287,6 +287,50 @@ export default function PacketDetail({ open, loading, detail, onOpenChange }: Pr
               )}
             </Section>
 
+            {detail.decoded?.malformed && (
+              <p className="text-destructive text-xs">
+                Malformed packet: {detail.decoded.malformed}. MeshCore firmware drops packets like this.
+              </p>
+            )}
+
+            {detail.decoded?.control && (
+              <Section title="Control">
+                {detail.decoded.control.kind === "DISCOVER_REQ" && (
+                  <>
+                    <Field label="Kind" value="Node discovery request" />
+                    <Field
+                      label="Looking for"
+                      value={detail.decoded.control.typeFilter.map((t) => ADV_TYPE_NAMES[t] ?? String(t)).join(", ") || "—"}
+                    />
+                    <Field label="Answer with" value={detail.decoded.control.prefixOnly ? "8-byte key prefix" : "full public key"} />
+                    {detail.decoded.control.since > 0 && (
+                      <Field label="Changed since" value={formatDateTime(detail.decoded.control.since * 1000)} />
+                    )}
+                    <Field label="Tag" value={detail.decoded.control.tag.toString(16).padStart(8, "0")} mono />
+                  </>
+                )}
+                {detail.decoded.control.kind === "DISCOVER_RESP" && (
+                  <>
+                    <Field label="Kind" value="Node discovery response" />
+                    <Field
+                      label="Responder"
+                      value={nodeForHash(detail.decoded.control.pubkey, nodeDir)?.name || "unknown node"}
+                    />
+                    <Field
+                      label="Node type"
+                      value={ADV_TYPE_NAMES[detail.decoded.control.nodeType] ?? String(detail.decoded.control.nodeType)}
+                    />
+                    <Field label="Request heard at" value={`${detail.decoded.control.snr.toFixed(2)} dB SNR`} />
+                    <Field label="Tag" value={detail.decoded.control.tag.toString(16).padStart(8, "0")} mono />
+                    <Field label="Public key" value={detail.decoded.control.pubkey} mono />
+                  </>
+                )}
+                {detail.decoded.control.kind === "UNKNOWN" && (
+                  <Field label="Sub type" value={`0x${detail.decoded.control.subType.toString(16).padStart(2, "0")} (unknown)`} />
+                )}
+              </Section>
+            )}
+
             {detail.advert && (
               <Section title="Advertised identity">
                 <Field label="Name" value={detail.advert.name || "—"} />

@@ -13,13 +13,36 @@ const ADV_TYPE_REPEATER = 2;
 // A very small cost per recency rank. It breaks ties between equal distances.
 const RECENCY_EPS_KM = 1e-6;
 
+// Index of node lists by first pubkey byte, most recent first in each bucket.
+// The WeakMap keys on the array, so a new node list gets a new index.
+const indexCache = new WeakMap();
+
+function byFirstByte(nodes) {
+  let idx = indexCache.get(nodes);
+  if (idx) return idx;
+  idx = new Map();
+  for (const n of nodes) {
+    const key = n.pubkey.slice(0, 2).toLowerCase();
+    const bucket = idx.get(key);
+    if (bucket) bucket.push(n);
+    else idx.set(key, [n]);
+  }
+  for (const bucket of idx.values()) bucket.sort((a, b) => (b.updated_at ?? 0) - (a.updated_at ?? 0));
+  indexCache.set(nodes, idx);
+  return idx;
+}
+
 /** Nodes whose pubkey starts with `hash`, most recent first. */
 export function nodesForHash(hash, nodes) {
   if (!hash) return [];
   const h = hash.toLowerCase();
-  return nodes
-    .filter((n) => n.pubkey.toLowerCase().startsWith(h))
-    .sort((a, b) => (b.updated_at ?? 0) - (a.updated_at ?? 0));
+  if (h.length < 2) {
+    return nodes
+      .filter((n) => n.pubkey.toLowerCase().startsWith(h))
+      .sort((a, b) => (b.updated_at ?? 0) - (a.updated_at ?? 0));
+  }
+  const bucket = byFirstByte(nodes).get(h.slice(0, 2)) ?? [];
+  return h.length === 2 ? bucket.slice() : bucket.filter((n) => n.pubkey.toLowerCase().startsWith(h));
 }
 
 /** Hop candidates: the matching repeaters, or all matches if no repeater matches. */

@@ -2,7 +2,7 @@
  * Read-only JSON API backed by D1, mounted under /~/api by the worker entry.
  */
 import { Hono } from "hono";
-import { analyzeRaw, bytesToHex } from "./lib/decode.js";
+import { analyzeRaw, bytesToHex, decodeControl, PAYLOAD_TYPE_CONTROL } from "./lib/decode.js";
 import { detectScope } from "./lib/scope.js";
 import { resolveCountry } from "./lib/geo.js";
 import { CELL_DEG } from "./coverage.js";
@@ -17,8 +17,12 @@ export const api = new Hono();
  */
 async function resolveHops(db, path) {
   const byKey = new Map();
-  for (const h of new Set(path.filter(Boolean).map((x) => x.toLowerCase()))) {
-    const rows = await db.prepare(`SELECT * FROM nodes WHERE pubkey LIKE ?`).bind(`${h}%`).all();
+  for (const h of new Set(path.map((x) => String(x).toLowerCase()).filter((x) => /^[0-9a-f]+$/.test(x)))) {
+    // Prefix range on the primary key: every hex char is < 'g'.
+    const rows = await db
+      .prepare(`SELECT * FROM nodes WHERE pubkey >= ? AND pubkey < ?`)
+      .bind(h, `${h}g`)
+      .all();
     for (const n of rows.results || []) byKey.set(n.pubkey, n);
   }
   const nodes = resolvePath(path, [...byKey.values()]);
@@ -121,7 +125,7 @@ api.get("/packets/:id", async (c) => {
               COALESCE(n.lon, d.lon) AS obs_lon
          FROM receptions r
          LEFT JOIN devices d ON d.origin_id = r.origin_id
-         LEFT JOIN nodes n ON LOWER(n.pubkey) = LOWER(r.origin_id)
+         LEFT JOIN nodes n ON n.pubkey = LOWER(r.origin_id)
         WHERE r.packet_id = ? ORDER BY r.received_at DESC LIMIT 50`
     )
     .bind(id)
@@ -145,6 +149,8 @@ api.get("/packets/:id", async (c) => {
         pathHashSize: packet.pathHashSize,
         pathBytes: packet.path,
         traceSnrs: packet.traceSnrs ?? null,
+        malformed: packet.malformed ?? null,
+        control: packet.payloadType === PAYLOAD_TYPE_CONTROL ? decodeControl(packet.payload) : null,
         // transport scoping: raw codes + freshly matched region (recomputed so
         // dictionary additions show up without waiting for the backfill)
         transportCodes: packet.transportCodes ?? null,
@@ -274,7 +280,7 @@ api.get("/adverts/:pubkey/history", async (c) => {
   }
 
   const node = await c.env.DB
-    .prepare(`SELECT * FROM nodes WHERE LOWER(pubkey) = ?`)
+    .prepare(`SELECT * FROM nodes WHERE pubkey = ?`)
     .bind(pubkey)
     .first();
   return c.json({ pubkey, node: node || null, events });
@@ -291,7 +297,7 @@ api.get("/repeaters", async (c) => {
             t.observer_id AS telemetry_observer,
             t.snr AS telemetry_snr, t.rssi AS telemetry_rssi
        FROM nodes n
-       LEFT JOIN repeater_telemetry t ON LOWER(t.pubkey) = LOWER(n.pubkey)
+       LEFT JOIN repeater_telemetry t ON t.pubkey = n.pubkey
       WHERE n.adv_type = 2
       ORDER BY n.updated_at DESC`
   ).all();
@@ -336,10 +342,10 @@ api.get("/repeaters/:pk", async (c) => {
   if (pk.length !== 64) return c.json({ error: "bad pubkey" }, 400);
   const db = c.env.DB;
 
-  const node = await db.prepare(`SELECT * FROM nodes WHERE LOWER(pubkey) = ?`).bind(pk).first();
+  const node = await db.prepare(`SELECT * FROM nodes WHERE pubkey = ?`).bind(pk).first();
 
   const tRow = await db
-    .prepare(`SELECT * FROM repeater_telemetry WHERE LOWER(pubkey) = ?`)
+    .prepare(`SELECT * FROM repeater_telemetry WHERE pubkey = ?`)
     .bind(pk)
     .first();
   let telemetry = null;
@@ -399,7 +405,7 @@ api.get("/nodes", async (c) => {
             COALESCE(n.lon, d.lon) AS lon,
             CASE WHEN n.lat IS NOT NULL THEN 'advert' ELSE 'iata' END AS loc_source
        FROM devices d
-       LEFT JOIN nodes n ON LOWER(n.pubkey) = LOWER(d.origin_id)
+       LEFT JOIN nodes n ON n.pubkey = LOWER(d.origin_id)
       WHERE COALESCE(n.lat, d.lat) IS NOT NULL
       ORDER BY d.last_seen DESC`
   ).all();

@@ -67,11 +67,11 @@ export async function purgeStaleObservers(env, now = Date.now()) {
  */
 export async function purgeStaleRepeaters(env, now = Date.now()) {
   const cutoff = now - REPEATER_RETENTION_MS;
-  const stale = `SELECT LOWER(pubkey) FROM nodes WHERE adv_type = 2 AND (updated_at IS NULL OR updated_at < ?)`;
+  const stale = `SELECT pubkey FROM nodes WHERE adv_type = 2 AND (updated_at IS NULL OR updated_at < ?)`;
   const db = env.DB;
   // Telemetry first: its subquery needs the node rows the second statement removes.
   const res = await db.batch([
-    db.prepare(`DELETE FROM repeater_telemetry WHERE LOWER(pubkey) IN (${stale})`).bind(cutoff),
+    db.prepare(`DELETE FROM repeater_telemetry WHERE pubkey IN (${stale})`).bind(cutoff),
     db.prepare(`DELETE FROM nodes WHERE adv_type = 2 AND (updated_at IS NULL OR updated_at < ?)`).bind(cutoff),
   ]);
   const deleted = {
@@ -97,11 +97,11 @@ export async function purgeOrphanNodes(env) {
     .prepare(`SELECT 1 FROM packets WHERE payload_type = 4 AND advert_pubkey IS NULL LIMIT 1`)
     .first();
   if (pending) return { skipped: "advert_pubkey backfill pending" };
-  const orphan = `NOT EXISTS (SELECT 1 FROM packets p WHERE p.advert_pubkey = LOWER(nodes.pubkey))
-     AND NOT EXISTS (SELECT 1 FROM packets p WHERE p.target_pubkey = LOWER(nodes.pubkey))`;
+  const orphan = `NOT EXISTS (SELECT 1 FROM packets p WHERE p.advert_pubkey = nodes.pubkey)
+     AND NOT EXISTS (SELECT 1 FROM packets p WHERE p.target_pubkey = nodes.pubkey)`;
   const res = await db.batch([
     db.prepare(
-      `DELETE FROM repeater_telemetry WHERE LOWER(pubkey) IN (SELECT LOWER(pubkey) FROM nodes WHERE ${orphan})`
+      `DELETE FROM repeater_telemetry WHERE pubkey IN (SELECT pubkey FROM nodes WHERE ${orphan})`
     ),
     db.prepare(`DELETE FROM nodes WHERE ${orphan}`),
   ]);

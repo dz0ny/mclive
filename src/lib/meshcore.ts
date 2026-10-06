@@ -42,6 +42,29 @@ export interface Reception {
   obs_lon?: number | null;
 }
 
+export type ControlInfo =
+  | {
+      kind: "DISCOVER_REQ";
+      subType: number;
+      prefixOnly: boolean;
+      /** ADV_TYPE_* values the sender wants answers from */
+      typeFilter: number[];
+      tag: number;
+      /** epoch secs, 0 = no filter */
+      since: number;
+    }
+  | {
+      kind: "DISCOVER_RESP";
+      subType: number;
+      nodeType: number;
+      /** SNR in dB at which the responder heard the request */
+      snr: number;
+      tag: number;
+      /** responder pubkey: 8-byte prefix or the full 32 bytes (hex) */
+      pubkey: string;
+    }
+  | { kind: "UNKNOWN"; subType: number };
+
 export interface DecodedWire {
   route: string;
   routeType: number;
@@ -58,6 +81,10 @@ export interface DecodedWire {
   transportCodes?: [number, number] | null;
   /** matched region name, "" = unknown region / Share, null = not transport */
   scope?: string | null;
+  /** why the firmware would drop this packet, e.g. a reserved path hash size */
+  malformed?: string | null;
+  /** decoded CONTROL (0x0B) payload, else null */
+  control?: ControlInfo | null;
   payloadOffset: number;
   payloadLen: number;
   payloadHex: string;
