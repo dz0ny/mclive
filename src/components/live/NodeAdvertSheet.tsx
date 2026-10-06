@@ -463,7 +463,7 @@ function crc32(bytes: Uint8Array): number {
 }
 
 /** Minimal single-file ZIP, stored (no compression) — enough for a .kmz. */
-function zipStore(filename: string, data: Uint8Array): Uint8Array {
+function zipStore(filename: string, data: Uint8Array): Uint8Array<ArrayBuffer> {
   const name = new TextEncoder().encode(filename);
   const crc = crc32(data);
   const size = data.length;

@@ -39,7 +39,7 @@ export interface ChannelMessage {
   text: string;
 }
 
-export function base64ToBytes(b64: string): Uint8Array {
+export function base64ToBytes(b64: string): Uint8Array<ArrayBuffer> {
   const bin = atob(b64);
   const out = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
@@ -52,7 +52,7 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(bin);
 }
 
-function hexToBytes(hex: string): Uint8Array {
+function hexToBytes(hex: string): Uint8Array<ArrayBuffer> {
   const clean = hex.replace(/[^0-9a-fA-F]/g, "");
   const out = new Uint8Array(clean.length >> 1);
   for (let i = 0; i < out.length; i++) out[i] = parseInt(clean.substr(i * 2, 2), 16);
@@ -78,7 +78,7 @@ export async function deriveChannel(
   const norm = normalizeName(name);
   if (!norm) return null;
   try {
-    let secret: Uint8Array;
+    let secret: Uint8Array<ArrayBuffer>;
     let kind: ChannelKind;
     if (pskBase64 && pskBase64.trim()) {
       secret = base64ToBytes(pskBase64.trim());
