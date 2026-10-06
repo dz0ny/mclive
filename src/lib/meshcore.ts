@@ -1,6 +1,7 @@
 // Shared MeshCore types + display helpers for the live dashboard.
 
 import { analyzeRaw, bytesToHex, PAYLOAD_TYPE_ADVERT } from "../../worker/lib/decode.js";
+import { nodesForHash, resolvePath } from "../../worker/lib/hops.js";
 
 /** A logical packet (deduped by hash; heard by one or more observers). */
 export interface Packet {
@@ -379,28 +380,21 @@ export function hashColor(hashByte: string): string {
 }
 
 /**
- * Resolve a pubkey prefix (path hop hash, src hash, beacon prefix) to a node.
- * Hashes are 1–4 bytes (the leading bytes of the pubkey), so match by pubkey
- * prefix rather than a fixed byte. Short prefixes collide; among matches prefer
- * a repeater when resolving a path hop ({ hop: true } — only repeaters relay),
- * then the most recently heard node.
+ * Resolve a pubkey prefix (src hash, beacon prefix) to a node. Hashes are 1–4
+ * bytes, so we match by pubkey prefix. If more than one node matches, we pick
+ * the most recent one. Use resolveHops for path hops.
  */
-export function nodeForHash(hash: string, nodes: MeshNode[], opts: { hop?: boolean } = {}): MeshNode | null {
-  if (!hash) return null;
-  const h = hash.toLowerCase();
-  const rank = (n: MeshNode) => (opts.hop && n.adv_type === ADV_TYPE_REPEATER ? 1 : 0);
-  let best: MeshNode | null = null;
-  for (const n of nodes) {
-    if (!n.pubkey.toLowerCase().startsWith(h)) continue;
-    if (
-      !best ||
-      rank(n) > rank(best) ||
-      (rank(n) === rank(best) && (n.updated_at ?? 0) > (best.updated_at ?? 0))
-    ) {
-      best = n;
-    }
-  }
-  return best;
+export function nodeForHash(hash: string, nodes: MeshNode[]): MeshNode | null {
+  return (nodesForHash(hash, nodes)[0] as MeshNode | undefined) ?? null;
+}
+
+/**
+ * Resolve all hops of a path together (see worker/lib/hops.js). The result has
+ * one node (or null) per hop. Adjacent hop positions decide between nodes that
+ * share a short hash.
+ */
+export function resolveHops(path: string[], nodes: MeshNode[]): (MeshNode | null)[] {
+  return resolvePath(path, nodes) as (MeshNode | null)[];
 }
 
 /**
@@ -440,8 +434,6 @@ export function formatTime(epochMs: number): string {
 export function formatDateTime(epochMs: number): string {
   return new Date(epochMs).toLocaleString(undefined, { hour12: false });
 }
-
-export const ADV_TYPE_REPEATER = 2;
 
 export const ADV_TYPE_NAMES: Record<number, string> = {
   0: "none",

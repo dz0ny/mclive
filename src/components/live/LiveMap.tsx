@@ -26,6 +26,7 @@ import {
   formatAgo,
   formatTime,
   nodeForHash,
+  resolveHops,
   payloadTypeName,
   senderName,
   typeBadgeClass,
@@ -460,9 +461,7 @@ export default function LiveMap() {
     let total = 0;
     for (const p of allPackets) {
       if (p.last_seen < cutoff || p.path.length < 2) continue;
-      const hops = p.path
-        .map((h) => nodeForHash(h, nodes, { hop: true }))
-        .filter((n): n is MeshNode => !!n && !(n.lat === 0 && n.lon === 0));
+      const hops = resolveHops(p.path, nodes).filter((n): n is MeshNode => !!n && !(n.lat === 0 && n.lon === 0));
       if (hops.length < 2) continue; // not enough to draw a path
       if (!hops.some((n) => inExtent(n, extent))) continue;
       total++;

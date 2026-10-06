@@ -7,6 +7,7 @@ import {
   formatDateTime,
   type Hop,
   nodeForHash,
+  resolveHops,
   payloadTypeDescription,
   payloadTypeName,
   routeBadgeClass,
@@ -94,7 +95,8 @@ export default function PacketDetail({ open, loading, detail, onOpenChange }: Pr
     if (selectedRec == null) return detail.hops;
     const rec = detail.receptions[selectedRec];
     if (!rec) return detail.hops;
-    return rec.path.map((hash) => ({ hash, node: nodeForHash(hash, nodeDir, { hop: true }) }));
+    const nodes = resolveHops(rec.path, nodeDir);
+    return rec.path.map((hash, i) => ({ hash, node: nodes[i] }));
   }, [detail, selectedRec, nodeDir]);
 
   // TRACE (type 9): the path IS the traceroute, and decoded.traceSnrs carries

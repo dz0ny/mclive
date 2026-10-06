@@ -6,21 +6,23 @@ import { analyzeRaw, bytesToHex } from "./lib/decode.js";
 import { detectScope } from "./lib/scope.js";
 import { resolveCountry } from "./lib/geo.js";
 import { CELL_DEG } from "./coverage.js";
+import { resolvePath } from "./lib/hops.js";
 
 export const api = new Hono();
 
 /**
- * Resolve a path hop hash (1–4 leading pubkey bytes) to a node. Short hashes
- * collide, so prefer a repeater (only repeaters relay), then the most recently
- * heard node.
+ * Resolve all hops of a path to nodes (see lib/hops.js). We load every node
+ * that matches a hop hash. Then adjacent hop positions decide between nodes
+ * that share a short hash.
  */
-async function hopNode(db, hash) {
-  if (!hash) return null;
-  const node = await db
-    .prepare(`SELECT * FROM nodes WHERE pubkey LIKE ? ORDER BY (adv_type = 2) DESC, updated_at DESC LIMIT 1`)
-    .bind(`${hash.toLowerCase()}%`)
-    .first();
-  return node || null;
+async function resolveHops(db, path) {
+  const byKey = new Map();
+  for (const h of new Set(path.filter(Boolean).map((x) => x.toLowerCase()))) {
+    const rows = await db.prepare(`SELECT * FROM nodes WHERE pubkey LIKE ?`).bind(`${h}%`).all();
+    for (const n of rows.results || []) byKey.set(n.pubkey, n);
+  }
+  const nodes = resolvePath(path, [...byKey.values()]);
+  return path.map((hash, i) => ({ hash, node: nodes[i] }));
 }
 
 // Newest deduped packets (one row per hash), most-recently-heard first.
@@ -108,8 +110,7 @@ api.get("/packets/:id", async (c) => {
 
   // Resolve each hop hash to a known node. Path hashes are 1–4 bytes (the
   // leading bytes of the sender's pubkey), so match by pubkey prefix.
-  const hops = [];
-  for (const h of pathArr) hops.push({ hash: h, node: await hopNode(db, h) });
+  const hops = await resolveHops(db, pathArr);
 
   // All observers that heard this packet, with the observer's location —
   // preferring its own self-advert location (nodes) over the IATA approximation.
@@ -371,8 +372,7 @@ api.get("/repeaters/:pk", async (c) => {
       : traceRow.path
         ? String(traceRow.path).split(",").filter(Boolean)
         : [];
-    const hops = [];
-    for (const h of pathArr) hops.push({ hash: h, node: await hopNode(db, h) });
+    const hops = await resolveHops(db, pathArr);
     trace = {
       id: traceRow.id,
       hash: traceRow.hash,

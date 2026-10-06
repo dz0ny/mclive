@@ -22,7 +22,7 @@ import CircleStyle from "ol/style/Circle";
 import Control from "ol/control/Control";
 import "ol/ol.css";
 import type { MeshNode, Packet } from "@/lib/meshcore";
-import { hashColor, nodeForHash } from "@/lib/meshcore";
+import { hashColor, resolveHops } from "@/lib/meshcore";
 
 // Per-type node markers (lucide-style inline SVG): 1=chat(person), 2=repeater
 // (radio tower), 3=room server (home), 4=sensor (activity).
@@ -601,8 +601,7 @@ export default function PacketMap({
     const map = mapRef.current;
 
     const coords: number[][] = [];
-    for (const h of latest.path) {
-      const node = nodeForHash(h, nodesRef.current, { hop: true });
+    for (const node of resolveHops(latest.path, nodesRef.current)) {
       if (node) coords.push(fromLonLat([node.lon, node.lat]));
     }
     if (coords.length < 1) return;
@@ -651,8 +650,7 @@ export default function PacketMap({
     if (!pinnedPath || pinnedPath.length === 0) return;
 
     const coords: number[][] = [];
-    for (const h of pinnedPath) {
-      const node = nodeForHash(h, nodesRef.current, { hop: true });
+    for (const node of resolveHops(pinnedPath, nodesRef.current)) {
       if (node) coords.push(fromLonLat([node.lon, node.lat]));
     }
     if (coords.length === 0) return;
