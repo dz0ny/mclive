@@ -3,6 +3,7 @@ import type { Observer, ObserverStatus } from "@/lib/meshcore";
 import { formatAgo, formatUptime, observerStatus } from "@/lib/meshcore";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -12,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import ObserverSetup from "./ObserverSetup";
 import { useUrlString } from "./useUrlState";
 
 const STATUS_META: Record<ObserverStatus, { label: string; dot: string }> = {
@@ -34,6 +36,8 @@ export default function Observers() {
   const [loading, setLoading] = useState(true);
   // region filter lives in the URL so a filtered view is shareable
   const [region, setRegion] = useUrlString("region", "all");
+  // active tab lives in the URL too, so the setup guide can be linked directly
+  const [tab, setTab] = useUrlString("tab", "status");
   const [now, setNow] = useState(() => Date.now());
 
   const load = () =>
@@ -101,113 +105,126 @@ export default function Observers() {
         </Button>
       </div>
 
-      {/* region filter */}
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <span className="text-sm font-medium text-muted-foreground">Region:</span>
-        <RegionPill active={region === "all"} onClick={() => setRegion("all")}>All</RegionPill>
-        {regions.map((r) => (
-          <RegionPill key={r} active={region === r} onClick={() => setRegion(r)}>
-            {r}
-          </RegionPill>
-        ))}
-      </div>
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList className="mb-4">
+          <TabsTrigger value="status">Status</TabsTrigger>
+          <TabsTrigger value="publish">Publish data</TabsTrigger>
+        </TabsList>
 
-      {/* summary */}
-      <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
-        <Count dot="bg-emerald-500" n={counts.online} label="Online" />
-        <Count dot="bg-amber-500" n={counts.stale} label="Stale" />
-        <Count dot="bg-rose-500" n={counts.offline} label="Offline" />
-        <span className="flex items-center gap-2 text-muted-foreground">
-          <span aria-hidden>📡</span>
-          <span className="font-semibold text-foreground">{counts.total}</span> Total
-        </span>
-      </div>
+        <TabsContent value="status">
+          {/* region filter */}
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium text-muted-foreground">Region:</span>
+            <RegionPill active={region === "all"} onClick={() => setRegion("all")}>All</RegionPill>
+            {regions.map((r) => (
+              <RegionPill key={r} active={region === r} onClick={() => setRegion(r)}>
+                {r}
+              </RegionPill>
+            ))}
+          </div>
 
-      <div className="rounded-lg border">
-        <Table className="min-w-[920px]">
-          <TableHeader>
-            <TableRow className="text-[11px] uppercase tracking-wide text-muted-foreground">
-              <TableHead>Status</TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>Region</TableHead>
-              <TableHead>Last status</TableHead>
-              <TableHead>Last packet</TableHead>
-              <TableHead>Packet health</TableHead>
-              <TableHead className="text-right">Total packets</TableHead>
-              <TableHead>Packets/hour</TableHead>
-              <TableHead>Clock offset</TableHead>
-              <TableHead>Uptime</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">
-                  {loading ? "Loading observers…" : "No observers yet."}
-                </TableCell>
-              </TableRow>
-            )}
-            {rows.map((o) => {
-              const status = observerStatus(o, now);
-              const meta = STATUS_META[status];
-              const health = packetHealth(o.last_packet_at, now);
-              const rate = o.packets_last_hour || 0;
-              const offset = o.clock_offset_ms;
-              return (
-                <TableRow key={o.origin_id}>
-                  <TableCell>
-                    <span className="flex items-center gap-2">
-                      <span className={cn("inline-block h-2.5 w-2.5 rounded-full", meta.dot)} />
-                      {meta.label}
-                    </span>
-                  </TableCell>
-                  <TableCell className="font-medium">{o.origin || o.origin_id.slice(0, 12)}</TableCell>
-                  <TableCell>
-                    {o.iata ? (
-                      <Badge variant="outline" className="font-mono text-[11px]">{o.iata}</Badge>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{formatAgo(o.last_status_at, now)}</TableCell>
-                  <TableCell className="text-muted-foreground">{formatAgo(o.last_packet_at, now)}</TableCell>
-                  <TableCell className={health.cls}>{health.label}</TableCell>
-                  <TableCell className="text-right tabular-nums">{(o.total_packets || 0).toLocaleString()}</TableCell>
-                  <TableCell>
-                    <span className="flex items-center gap-2">
-                      <span className="h-1.5 w-24 overflow-hidden rounded-full bg-muted">
-                        <span
-                          className="block h-full rounded-full bg-sky-500"
-                          style={{ width: `${Math.round((rate / maxRate) * 100)}%` }}
-                        />
-                      </span>
-                      <span className="tabular-nums text-muted-foreground">{rate}/hr</span>
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    {offset == null ? (
-                      <span className="text-muted-foreground">—</span>
-                    ) : (
-                      <span
-                        className={cn(
-                          "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs tabular-nums",
-                          Math.abs(offset) < 5000
-                            ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                            : "bg-rose-500/15 text-rose-600 dark:text-rose-400"
-                        )}
-                        title={`${offset} ms`}
-                      >
-                        <span aria-hidden>⏱</span>({Math.round(offset / 1000)}s)
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell className="tabular-nums text-muted-foreground">{formatUptime(o.uptime_secs)}</TableCell>
+          {/* summary */}
+          <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+            <Count dot="bg-emerald-500" n={counts.online} label="Online" />
+            <Count dot="bg-amber-500" n={counts.stale} label="Stale" />
+            <Count dot="bg-rose-500" n={counts.offline} label="Offline" />
+            <span className="flex items-center gap-2 text-muted-foreground">
+              <span aria-hidden>📡</span>
+              <span className="font-semibold text-foreground">{counts.total}</span> Total
+            </span>
+          </div>
+
+          <div className="rounded-lg border">
+            <Table className="min-w-[920px]">
+              <TableHeader>
+                <TableRow className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  <TableHead>Status</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Region</TableHead>
+                  <TableHead>Last status</TableHead>
+                  <TableHead>Last packet</TableHead>
+                  <TableHead>Packet health</TableHead>
+                  <TableHead className="text-right">Total packets</TableHead>
+                  <TableHead>Packets/hour</TableHead>
+                  <TableHead>Clock offset</TableHead>
+                  <TableHead>Uptime</TableHead>
                 </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </div>
+              </TableHeader>
+              <TableBody>
+                {rows.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">
+                      {loading ? "Loading observers…" : "No observers yet."}
+                    </TableCell>
+                  </TableRow>
+                )}
+                {rows.map((o) => {
+                  const status = observerStatus(o, now);
+                  const meta = STATUS_META[status];
+                  const health = packetHealth(o.last_packet_at, now);
+                  const rate = o.packets_last_hour || 0;
+                  const offset = o.clock_offset_ms;
+                  return (
+                    <TableRow key={o.origin_id}>
+                      <TableCell>
+                        <span className="flex items-center gap-2">
+                          <span className={cn("inline-block h-2.5 w-2.5 rounded-full", meta.dot)} />
+                          {meta.label}
+                        </span>
+                      </TableCell>
+                      <TableCell className="font-medium">{o.origin || o.origin_id.slice(0, 12)}</TableCell>
+                      <TableCell>
+                        {o.iata ? (
+                          <Badge variant="outline" className="font-mono text-[11px]">{o.iata}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{formatAgo(o.last_status_at, now)}</TableCell>
+                      <TableCell className="text-muted-foreground">{formatAgo(o.last_packet_at, now)}</TableCell>
+                      <TableCell className={health.cls}>{health.label}</TableCell>
+                      <TableCell className="text-right tabular-nums">{(o.total_packets || 0).toLocaleString()}</TableCell>
+                      <TableCell>
+                        <span className="flex items-center gap-2">
+                          <span className="h-1.5 w-24 overflow-hidden rounded-full bg-muted">
+                            <span
+                              className="block h-full rounded-full bg-sky-500"
+                              style={{ width: `${Math.round((rate / maxRate) * 100)}%` }}
+                            />
+                          </span>
+                          <span className="tabular-nums text-muted-foreground">{rate}/hr</span>
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        {offset == null ? (
+                          <span className="text-muted-foreground">—</span>
+                        ) : (
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs tabular-nums",
+                              Math.abs(offset) < 5000
+                                ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                                : "bg-rose-500/15 text-rose-600 dark:text-rose-400"
+                            )}
+                            title={`${offset} ms`}
+                          >
+                            <span aria-hidden>⏱</span>({Math.round(offset / 1000)}s)
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="tabular-nums text-muted-foreground">{formatUptime(o.uptime_secs)}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="publish">
+          <ObserverSetup />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
